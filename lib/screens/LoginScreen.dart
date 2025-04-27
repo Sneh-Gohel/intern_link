@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intern_link/screens/HomeScreen.dart';
+import 'package:intern_link/service/FadeTransitionPageRoute.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -58,16 +60,21 @@ class _LoginScreenState extends State<LoginScreen>
 
     if (_usernameController.text == "admin" &&
         _passwordController.text == "123") {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Logged in Successfully as Admin'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          backgroundColor: Colors.green.shade600,
-        ),
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: const Text('Logged in Successfully as Admin'),
+      //     behavior: SnackBarBehavior.floating,
+      //     shape: RoundedRectangleBorder(
+      //       borderRadius: BorderRadius.circular(10),
+      //     ),
+      //     backgroundColor: Colors.green.shade600,
+      //   ),
+      // );
+      Future.delayed(const Duration(seconds: 3), () {
+      Navigator.of(context).pushReplacement(
+        FadeTransitionPageRoute(page: const HomeScreen()),
       );
+    });
       // Navigate to home/dashboard here
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
