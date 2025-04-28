@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intern_link/models/user_model.dart';
 import 'package:intern_link/screens/HomeScreen.dart';
 import 'package:intern_link/service/FadeTransitionPageRoute.dart';
+import 'package:intern_link/service/json_data_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -13,13 +14,14 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -47,82 +49,127 @@ class _LoginScreenState extends State<LoginScreen>
 
   @override
   void dispose() {
-    _usernameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _animationController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    setState(() => _isLoading = true);
-
-    await Future.delayed(const Duration(seconds: 1)); // Simulate loading
-
-    if (_usernameController.text == "admin" &&
-        _passwordController.text == "123") {
-      // ScaffoldMessenger.of(context).showSnackBar(
-      //   SnackBar(
-      //     content: const Text('Logged in Successfully as Admin'),
-      //     behavior: SnackBarBehavior.floating,
-      //     shape: RoundedRectangleBorder(
-      //       borderRadius: BorderRadius.circular(10),
-      //     ),
-      //     backgroundColor: Colors.green.shade600,
-      //   ),
-      // );
-      Future.delayed(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacement(
-        FadeTransitionPageRoute(page: const HomeScreen()),
-      );
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
     });
-      // Navigate to home/dashboard here
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Invalid Credentials'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          backgroundColor: Colors.red.shade600,
+
+    try {
+      // Load users from JSON
+      final users = await JsonDataService.loadUsers();
+      
+      // Find matching user
+      final matchedUser = users.firstWhere(
+        (user) => user.email == _emailController.text.trim() && 
+                  user.password == _passwordController.text.trim(),
+        orElse: () => User(
+          userId: '',
+          role: '',
+          name: '',
+          email: '',
+          password: '',
+          profile: UserProfile(),
+          status: '',
         ),
       );
-    }
 
-    setState(() => _isLoading = false);
+      if (matchedUser.userId.isNotEmpty) {
+        if (matchedUser.status == 'active') {
+          // Successful login
+          Navigator.of(context).pushReplacement(
+            FadeTransitionPageRoute(
+              page: HomeScreen(currentUser: matchedUser),
+            ),
+          );
+        } else {
+          setState(() {
+            _errorMessage = 'Your account is not active';
+          });
+        }
+      } else {
+        setState(() {
+          _errorMessage = 'Invalid email or password';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'An error occurred. Please try again.';
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _signInWithGoogle() async {
     try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = '';
+      });
+
       final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
       if (googleUser == null) return;
 
       final GoogleSignInAuthentication googleAuth =
           await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
+      
+      // In a real app, you would verify the Google token with your backend
+      // For JSON demo, we'll just check if the email exists in our users.json
 
-      UserCredential userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-      User? user = userCredential.user;
-
-      if (user != null) {
-        print("Name: ${user.displayName}");
-        print("Email: ${user.email}");
-        print("Profile Photo: ${user.photoURL}");
-        print("UID: ${user.uid}");
-      }
-    } catch (e) {
-      print('Google Sign-In Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red.shade600,
+      final users = await JsonDataService.loadUsers();
+      final matchedUser = users.firstWhere(
+        (user) => user.email == googleUser.email,
+        orElse: () => User(
+          userId: '',
+          role: '',
+          name: '',
+          email: '',
+          password: '',
+          profile: UserProfile(),
+          status: '',
         ),
       );
+
+      if (matchedUser.userId.isEmpty) {
+        // Create a new user for demo purposes
+        final newUser = User(
+          userId: 'user_${DateTime.now().millisecondsSinceEpoch}',
+          role: 'job_seeker',
+          name: googleUser.displayName ?? 'Google User',
+          email: googleUser.email,
+          password: 'google_auth',
+          profile: UserProfile(
+            profilePicture: googleUser.photoUrl,
+          ),
+          status: 'active',
+        );
+
+        // In a real app, you would save this new user to your database
+        Navigator.of(context).pushReplacement(
+          FadeTransitionPageRoute(
+            page: HomeScreen(currentUser: newUser),
+          ),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          FadeTransitionPageRoute(
+            page: HomeScreen(currentUser: matchedUser),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Google Sign-In Error: ${e.toString()}';
+      });
+    } finally {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -144,12 +191,11 @@ class _LoginScreenState extends State<LoginScreen>
         ),
         child: Stack(
           children: [
-            // Background texture effect
             Positioned.fill(
               child: Opacity(
                 opacity: 0.05,
                 child: Image.asset(
-                  'assets/images/texture.png', // Add a subtle texture image
+                  'assets/images/texture.png',
                   fit: BoxFit.cover,
                 ),
               ),
@@ -166,7 +212,6 @@ class _LoginScreenState extends State<LoginScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // App logo/name section
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -199,6 +244,37 @@ class _LoginScreenState extends State<LoginScreen>
 
                         const SizedBox(height: 60),
 
+                        // Error message
+                        if (_errorMessage.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.red.shade200,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(Icons.error_outline,
+                                      color: Colors.red.shade600),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage,
+                                      style: TextStyle(
+                                        color: Colors.red.shade800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
                         // Login card
                         Container(
                           padding: const EdgeInsets.all(28),
@@ -215,16 +291,16 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                           child: Column(
                             children: [
-                              // Username field
+                              // Email field
                               TextField(
-                                controller: _usernameController,
-                                style: const TextStyle(fontSize: 16),
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
                                 decoration: InputDecoration(
                                   prefixIcon: const Icon(
-                                    Icons.person_outline,
+                                    Icons.email_outlined,
                                     color: Color.fromARGB(255, 107, 146, 230),
                                   ),
-                                  labelText: "Username",
+                                  labelText: "Email",
                                   labelStyle: TextStyle(
                                     color: Colors.grey.shade600,
                                   ),
@@ -233,8 +309,7 @@ class _LoginScreenState extends State<LoginScreen>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: const BorderSide(
-                                        color:
-                                            Color.fromARGB(255, 26, 60, 124)),
+                                        color: Color.fromARGB(255, 26, 60, 124)),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
                                       vertical: 16, horizontal: 20),
@@ -247,7 +322,6 @@ class _LoginScreenState extends State<LoginScreen>
                               TextField(
                                 controller: _passwordController,
                                 obscureText: _obscurePassword,
-                                style: const TextStyle(fontSize: 16),
                                 decoration: InputDecoration(
                                   prefixIcon: const Icon(
                                     Icons.lock_outline,
@@ -275,15 +349,38 @@ class _LoginScreenState extends State<LoginScreen>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: const BorderSide(
-                                        color:
-                                            Color.fromARGB(255, 26, 60, 124)),
+                                        color: Color.fromARGB(255, 26, 60, 124)),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
                                       vertical: 16, horizontal: 20),
                                 ),
                               ),
 
-                              const SizedBox(height: 30),
+                              const SizedBox(height: 10),
+
+                              // Forgot password
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                            'Password reset feature coming soon!'),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    'Forgot Password?',
+                                    style: TextStyle(
+                                      color: Color.fromARGB(255, 107, 146, 230),
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 10),
 
                               // Login button
                               SizedBox(
@@ -361,7 +458,7 @@ class _LoginScreenState extends State<LoginScreen>
                                 width: double.infinity,
                                 height: 52,
                                 child: OutlinedButton.icon(
-                                  onPressed: _signInWithGoogle,
+                                  onPressed: _isLoading ? null : _signInWithGoogle,
                                   icon: Image.asset(
                                     'assets/images/google.png',
                                     height: 24,

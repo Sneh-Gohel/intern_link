@@ -1,0 +1,22 @@
+[
+    {
+      "internshipId": "internship_202",
+      "postedBy": "user_002",
+      "title": "Flutter App Developer Intern",
+      "description": "Build and maintain mobile apps using Flutter framework.",
+      "stipend": "8000 per month",
+      "location": "Remote",
+      "eligibility": "Any undergraduate degree",
+      "lastDate": "2025-06-15",
+      "applicationsReceived": [
+        {
+          "applicationId": "application_302",
+          "applicantId": "user_001",
+          "status": "pending",
+          "appliedOn": "2025-04-28"
+        }
+      ],
+      "status": "approved",
+      "companyLogo": "assets/images/techcorp_logo.png"
+    }
+  ]

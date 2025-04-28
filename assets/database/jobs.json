@@ -1,0 +1,22 @@
+[
+    {
+      "jobId": "job_101",
+      "postedBy": "user_002",
+      "title": "Software Engineer",
+      "description": "Develop web applications using modern technologies.",
+      "salary": "50000 per month",
+      "location": "Bangalore",
+      "eligibility": "B.Tech in CS or related",
+      "lastDate": "2025-05-30",
+      "applicationsReceived": [
+        {
+          "applicationId": "application_301",
+          "applicantId": "user_001",
+          "status": "pending",
+          "appliedOn": "2025-04-28"
+        }
+      ],
+      "status": "approved",
+      "companyLogo": "assets/images/techcorp_logo.png"
+    }
+  ]

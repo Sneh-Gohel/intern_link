@@ -1,0 +1,44 @@
+[
+    {
+      "userId": "user_001",
+      "role": "job_seeker",
+      "name": "John Doe",
+      "email": "admin",
+      "password": "123",
+      "profile": {
+        "resumeLink": "link_to_resume.pdf",
+        "skills": ["Python", "Flutter", "Machine Learning"],
+        "experience": "2 years",
+        "education": "Bachelor's in Computer Science",
+        "savedJobs": ["job_101", "internship_202"],
+        "profilePicture": "assets/images/profile1.jpg"
+      },
+      "status": "active"
+    },
+    {
+      "userId": "user_002",
+      "role": "employer",
+      "name": "TechCorp Ltd",
+      "email": "hr@techcorp.com",
+      "password": "hashed_password",
+      "profile": {
+        "companyWebsite": "https://techcorp.com",
+        "companyDescription": "We build tech solutions.",
+        "postedJobs": ["job_101"],
+        "postedInternships": ["internship_202"],
+        "profilePicture": "assets/images/analytics_pro.png"
+      },
+      "status": "active"
+    },
+    {
+      "userId": "user_003",
+      "role": "admin",
+      "name": "Admin User",
+      "email": "admin@example.com",
+      "password": "admin123",
+      "profile": {
+        "profilePicture": "assets/images/admin_profile.jpg"
+      },
+      "status": "active"
+    }
+  ]

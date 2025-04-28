@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:intern_link/models/internship_model.dart';
+import 'package:intern_link/models/job_model.dart';
+import 'package:intern_link/models/user_model.dart';
+import 'package:intern_link/screens/application_status_screen.dart';
+import 'package:intern_link/screens/internship_detail_screen.dart';
+import 'package:intern_link/screens/job_detail_screen.dart';
+import 'package:intern_link/screens/profile_screen.dart';
+import 'package:intern_link/screens/saved_items_screen.dart';
+import 'package:intern_link/service/json_data_service.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final User currentUser;
+
+  const HomeScreen({Key? key, required this.currentUser}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -11,40 +22,73 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
+  List<Internship> _internships = [];
+  List<Job> _jobs = [];
+  List<dynamic> _allListings = [];
+  bool _isLoading = true;
+  bool _showInternships = true;
 
-  // Sample internship data
-  final List<Map<String, dynamic>> _internships = [
-    {
-      'title': 'Flutter Developer Intern',
-      'company': 'Tech Innovations Inc.',
-      'logo': 'assets/images/tech_innovations.jpg',
-      'stipend': '\$1,500/month',
-      'location': 'Remote',
-      'duration': '3 months',
-      'deadline': 'May 15, 2023',
-      'isSaved': false,
-    },
-    {
-      'title': 'UX/UI Design Intern',
-      'company': 'Creative Minds Agency',
-      'logo': 'assets/images/creative_minds.png',
-      'stipend': '\$1,200/month',
-      'location': 'New York, NY',
-      'duration': '6 months',
-      'deadline': 'May 30, 2023',
-      'isSaved': true,
-    },
-    {
-      'title': 'Data Science Intern',
-      'company': 'Analytics Pro',
-      'logo': 'assets/images/analytics_pro.jpg',
-      'stipend': '\$2,000/month',
-      'location': 'San Francisco, CA',
-      'duration': '4 months',
-      'deadline': 'June 10, 2023',
-      'isSaved': false,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final internships = await JsonDataService.loadInternships();
+      final jobs = await JsonDataService.loadJobs();
+      
+      setState(() {
+        _internships = internships;
+        _jobs = jobs;
+        _allListings = [...internships, ...jobs];
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading data: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  void _toggleSaved(String id) {
+    setState(() {
+      if (widget.currentUser.profile.savedJobs?.contains(id) ?? false) {
+        widget.currentUser.profile.savedJobs?.remove(id);
+      } else {
+        widget.currentUser.profile.savedJobs ??= [];
+        widget.currentUser.profile.savedJobs?.add(id);
+      }
+    });
+    // In a real app, you would update this in your database
+  }
+
+  void _applyForListing(dynamic listing) {
+    setState(() {
+      // In a real app, you would create a new application in your database
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Applied for ${listing.title}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
+      );
+    });
+  }
+
+  List<dynamic> get _displayedListings {
+    return _showInternships 
+        ? _internships.where((i) => i.status == 'approved').toList()
+        : _jobs.where((j) => j.status == 'approved').toList();
+  }
+
+  List<dynamic> get _savedListings {
+    return _allListings.where((item) {
+      return widget.currentUser.profile.savedJobs?.contains(
+        item is Internship ? item.internshipId : item.jobId
+      ) ?? false;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +131,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: Colors.white.withOpacity(0.8),
                               ),
                             ),
-                            const Text(
-                              'Alex Johnson',
-                              style: TextStyle(
+                            Text(
+                              widget.currentUser.name.split(' ').first,
+                              style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -97,15 +141,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        const CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Colors.white,
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundImage: NetworkImage(
-                                'https://randomuser.me/api/portraits/men/1.jpg'),
-                          ),
-                        ),
+                        // GestureDetector(
+                        //   onTap: () {
+                        //     Navigator.push(
+                        //       context,
+                        //       MaterialPageRoute(
+                        //         builder: (context) => ProfileScreen(user: widget.currentUser),
+                        //       ),
+                        //     );
+                        //   },
+                        //   child: CircleAvatar(
+                        //     radius: 22,
+                        //     backgroundColor: Colors.white,
+                        //     child: CircleAvatar(
+                        //       radius: 20,
+                        //       backgroundImage: widget.currentUser.profile.profilePicture != null
+                        //           ? AssetImage(widget.currentUser.profile.profilePicture!)
+                        //           : const AssetImage('assets/images/default_profile.png'),
+                        //     ),
+                        //   ),
+                        // ),
                       ],
                     ),
                   ],
@@ -115,10 +170,12 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(75),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: TextField(
                   controller: _searchController,
+                  onChanged: (value) {
+                    setState(() {}); // Trigger rebuild for search
+                  },
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
@@ -189,20 +246,69 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 25),
 
-                  // Featured Internships
+                  // Toggle between Internships and Jobs
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Internships'),
+                          selected: _showInternships,
+                          onSelected: (selected) {
+                            setState(() {
+                              _showInternships = true;
+                            });
+                          },
+                          selectedColor: const Color.fromARGB(255, 107, 146, 230),
+                          labelStyle: TextStyle(
+                            color: _showInternships ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Jobs'),
+                          selected: !_showInternships,
+                          onSelected: (selected) {
+                            setState(() {
+                              _showInternships = false;
+                            });
+                          },
+                          selectedColor: const Color.fromARGB(255, 107, 146, 230),
+                          labelStyle: TextStyle(
+                            color: !_showInternships ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 25),
+
+                  // Featured Listings
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Featured Internships',
-                        style: TextStyle(
+                      Text(
+                        _showInternships ? 'Featured Internships' : 'Featured Jobs',
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Color.fromARGB(255, 26, 60, 124),
                         ),
                       ),
                       TextButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          // Navigator.push(
+                          //   context,
+                          //   MaterialPageRoute(
+                          //     builder: (context) => SavedItemsScreen(
+                          //       savedListings: _savedListings,
+                          //       currentUser: widget.currentUser,
+                          //     ),
+                          //   ),
+                          // );
+                        },
                         child: const Text(
                           'See all',
                           style: TextStyle(
@@ -217,24 +323,198 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Internship listings
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final internship = _internships[index];
-                return _buildInternshipCard(internship, context);
-              },
-              childCount: _internships.length,
-            ),
-          ),
+          // Listings
+          _isLoading
+              ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: CircularProgressIndicator(
+                        color: const Color.fromARGB(255, 107, 146, 230),
+                      ),
+                    ),
+                  ),
+                )
+              : _displayedListings.isEmpty
+                  ? SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Center(
+                          child: Text(
+                            'No ${_showInternships ? 'internships' : 'jobs'} available',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final listing = _displayedListings[index];
+                          return _buildListingCard(listing, context);
+                        },
+                        childCount: _displayedListings.length,
+                      ),
+                    ),
         ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
     );
   }
 
-  Widget _buildCategoryCard(
-      IconData icon, String title, Color bgColor, Color iconColor) {
+  Widget _buildListingCard(dynamic listing, BuildContext context) {
+    final isSaved = widget.currentUser.profile.savedJobs?.contains(
+      listing is Internship ? listing.internshipId : listing.jobId
+    ) ?? false;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.fromLTRB(15, 10, 15, 0),
+            leading: CircleAvatar(
+              radius: 25,
+              backgroundColor: const Color(0xFFF5F9FF),
+              backgroundImage: AssetImage(listing.companyLogo),
+            ),
+            title: Text(
+              listing.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color.fromARGB(255, 26, 60, 124),
+              ),
+            ),
+            subtitle: Text(
+              listing.postedBy, // In a real app, you'd look up the company name
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+            trailing: IconButton(
+              icon: Icon(
+                isSaved ? Iconsax.bookmark_25 : Iconsax.bookmark,
+                color: isSaved
+                    ? const Color.fromARGB(255, 107, 146, 230)
+                    : Colors.grey.shade400,
+              ),
+              onPressed: () {
+                _toggleSaved(listing is Internship 
+                    ? listing.internshipId 
+                    : listing.jobId);
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    _buildDetailChip(
+                      Iconsax.money,
+                      listing is Internship ? listing.stipend : listing.salary,
+                    ),
+                    const SizedBox(width: 10),
+                    _buildDetailChip(Iconsax.location, listing.location),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    _buildDetailChip(Iconsax.clock, "3 months"), // Hardcoded for demo
+                    const SizedBox(width: 10),
+                    _buildDetailChip(
+                      Iconsax.calendar,
+                      'Apply by ${listing.lastDate}',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 15),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      // Navigator.push(
+                      //   context,
+                      //   MaterialPageRoute(
+                      //     builder: (context) => listing is Internship
+                      //         ? InternshipDetailScreen(
+                      //             internship: listing,
+                      //             onApply: () => _applyForListing(listing),
+                      //             isSaved: isSaved,
+                      //             onSaveToggle: () => _toggleSaved(listing.internshipId),
+                      //         : JobDetailScreen(
+                      //             job: listing,
+                      //             onApply: () => _applyForListing(listing),
+                      //             isSaved: isSaved,
+                      //             onSaveToggle: () => _toggleSaved(listing.jobId),
+                      //   ),
+                      // );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: const BorderSide(
+                          color: Color.fromARGB(255, 107, 146, 230)),
+                    ),
+                    child: const Text(
+                      'View Details',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 107, 146, 230),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _applyForListing(listing);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 107, 146, 230),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Apply Now',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 15),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(IconData icon, String title, Color bgColor, Color iconColor) {
     return Container(
       width: 90,
       margin: const EdgeInsets.only(right: 15),
@@ -275,136 +555,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildInternshipCard(
-      Map<String, dynamic> internship, BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(20, 0, 20, 15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          ListTile(
-            contentPadding: const EdgeInsets.fromLTRB(15, 10, 15, 0),
-            leading: CircleAvatar(
-              radius: 25,
-              backgroundColor: const Color(0xFFF5F9FF),
-              child: Image.asset(
-                internship['logo'],
-                width: 30,
-                height: 30,
-              ),
-            ),
-            title: Text(
-              internship['title'],
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color.fromARGB(255, 26, 60, 124),
-              ),
-            ),
-            subtitle: Text(
-              internship['company'],
-              style: TextStyle(color: Colors.grey.shade600),
-            ),
-            trailing: IconButton(
-              icon: Icon(
-                internship['isSaved'] ? Iconsax.bookmark_25 : Iconsax.bookmark,
-                color: internship['isSaved']
-                    ? const Color.fromARGB(255, 107, 146, 230)
-                    : Colors.grey.shade400,
-              ),
-              onPressed: () {
-                setState(() {
-                  internship['isSaved'] = !internship['isSaved'];
-                });
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    _buildDetailChip(Iconsax.money, internship['stipend']),
-                    const SizedBox(width: 10),
-                    _buildDetailChip(Iconsax.location, internship['location']),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _buildDetailChip(Iconsax.clock, internship['duration']),
-                    const SizedBox(width: 10),
-                    _buildDetailChip(
-                        Iconsax.calendar, 'Apply by ${internship['deadline']}'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 15),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () {
-                      // View details action
-                    },
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: const BorderSide(
-                          color: Color.fromARGB(255, 107, 146, 230)),
-                    ),
-                    child: const Text(
-                      'View Details',
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 107, 146, 230),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      // Apply now action
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 107, 146, 230),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Apply Now',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 15),
-        ],
-      ),
-    );
-  }
-
   Widget _buildDetailChip(IconData icon, String text) {
     return Expanded(
       child: Container(
@@ -416,8 +566,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                size: 16, color: const Color.fromARGB(255, 107, 146, 230)),
+            Icon(icon, size: 16, color: const Color.fromARGB(255, 107, 146, 230)),
             const SizedBox(width: 5),
             Flexible(
               child: Text(
@@ -451,7 +600,40 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            if (index == 1) {
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (context) => SavedItemsScreen(
+              //       savedListings: _savedListings,
+              //       currentUser: widget.currentUser,
+              //     ),
+              //   ),
+              // );
+            } else if (index == 2) {
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (context) => ApplicationStatusScreen(
+              //       applications: _savedListings
+              //           .where((item) => item.applicationsReceived
+              //               .any((app) => app.applicantId == widget.currentUser.userId))
+              //           .toList(),
+              //     ),
+              //   ),
+              // );
+            } else if (index == 3) {
+              // Navigator.push(
+              //   context,
+              //   MaterialPageRoute(
+              //     builder: (context) => ProfileScreen(user: widget.currentUser),
+              //   ),
+              // );
+            } else {
+              setState(() => _currentIndex = index);
+            }
+          },
           backgroundColor: Colors.white,
           selectedItemColor: const Color.fromARGB(255, 107, 146, 230),
           unselectedItemColor: Colors.grey.shade500,
@@ -475,9 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Applications',
             ),
             BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 3
-                  ? Iconsax.profile_2user5
-                  : Iconsax.profile_2user),
+              icon: Icon(_currentIndex == 3 ? Iconsax.profile_2user5 : Iconsax.profile_2user),
               label: 'Profile',
             ),
           ],
