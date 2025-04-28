@@ -4,7 +4,7 @@ class Application {
   final String jobOrInternshipId;
   final String applicantId;
   final String appliedOn;
-  final String status;
+  late final String status;
   final String remarks;
 
   Application({

@@ -52,7 +52,7 @@ class UserProfile {
     this.companyDescription,
     this.postedJobs,
     this.postedInternships,
-    this.profilePicture,
+    this.profilePicture, String? companyLogo,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {

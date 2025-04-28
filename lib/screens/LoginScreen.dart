@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intern_link/models/user_model.dart';
 import 'package:intern_link/screens/HomeScreen.dart';
-import 'package:intern_link/service/FadeTransitionPageRoute.dart';
-import 'package:intern_link/service/json_data_service.dart';
+import 'package:intern_link/screens/SignupScreen.dart';
+import 'package:intern_link/services/FadeTransitionPageRoute.dart';
+import 'package:intern_link/services/json_data_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -56,56 +57,59 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _login() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = '';
-    });
+  setState(() {
+    _isLoading = true;
+    _errorMessage = '';
+  });
 
-    try {
-      // Load users from JSON
-      final users = await JsonDataService.loadUsers();
-      
-      // Find matching user
-      final matchedUser = users.firstWhere(
-        (user) => user.email == _emailController.text.trim() && 
-                  user.password == _passwordController.text.trim(),
-        orElse: () => User(
-          userId: '',
-          role: '',
-          name: '',
-          email: '',
-          password: '',
-          profile: UserProfile(),
-          status: '',
-        ),
-      );
+  try {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
 
-      if (matchedUser.userId.isNotEmpty) {
-        if (matchedUser.status == 'active') {
-          // Successful login
-          Navigator.of(context).pushReplacement(
-            FadeTransitionPageRoute(
-              page: HomeScreen(currentUser: matchedUser),
-            ),
-          );
-        } else {
-          setState(() {
-            _errorMessage = 'Your account is not active';
-          });
-        }
-      } else {
-        setState(() {
-          _errorMessage = 'Invalid email or password';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'An error occurred. Please try again.';
-      });
-    } finally {
-      setState(() => _isLoading = false);
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Please enter both email and password');
+      return;
     }
+
+    // Load users from JSON
+    final users = await JsonDataService.loadUsers();
+    
+    // Debug: Print loaded users to verify data
+    debugPrint('Loaded users: ${users.map((u) => u.email).toList()}');
+
+    // Find matching user (case-sensitive comparison)
+    User? matchedUser;
+    try {
+      matchedUser = users.firstWhere(
+        (user) => user.email == email && user.password == password,
+      );
+    } catch (e) {
+      debugPrint('User not found: $e');
+    }
+
+    if (matchedUser != null) {
+      if (matchedUser.status == 'active') {
+        debugPrint('Login successful for: ${matchedUser.email}');
+        // Successful login
+        Navigator.of(context).pushReplacement(
+          FadeTransitionPageRoute(
+            page: HomeScreen(currentUser: matchedUser),
+          ),
+        );
+      } else {
+        setState(() => _errorMessage = 'Your account is not active');
+      }
+    } else {
+      debugPrint('Invalid credentials for: $email');
+      setState(() => _errorMessage = 'Invalid email or password');
+    }
+  } catch (e) {
+    debugPrint('Login error: $e');
+    setState(() => _errorMessage = 'An error occurred. Please try again.');
+  } finally {
+    setState(() => _isLoading = false);
   }
+}
 
   Future<void> _signInWithGoogle() async {
     try {
@@ -498,16 +502,9 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                                   TextButton(
                                     onPressed: () {
-                                      ScaffoldMessenger.of(context)
-                                          .showSnackBar(
-                                        SnackBar(
-                                          content: const Text(
-                                              'Signup screen coming soon!'),
-                                          behavior: SnackBarBehavior.floating,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(10),
-                                          ),
+                                      Navigator.of(context).push(
+                                        FadeTransitionPageRoute(
+                                          page: const SignupScreen(),
                                         ),
                                       );
                                     },

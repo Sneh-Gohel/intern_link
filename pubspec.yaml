@@ -42,6 +42,9 @@ dependencies:
   cloud_firestore: ^5.6.6
   firebase_storage: ^12.4.5
   file_picker: ^10.1.2
+  image_picker: ^1.1.2
+  path_provider: ^2.1.5
+  url_launcher: ^6.3.1
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +72,11 @@ flutter:
   assets:
     - assets/images/
     - assets/database/
+    - assets/docs/user_001/
+    - assets/docs/user_002/
+    - assets/docs/user_003/
+    - assets/docs/user_004/
+    - assets/docs/user_005/
     # - assets/images/google.png
   #   - images/a_dot_ham.jpeg
 

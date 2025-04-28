@@ -8,7 +8,7 @@ import 'package:intern_link/screens/internship_detail_screen.dart';
 import 'package:intern_link/screens/job_detail_screen.dart';
 import 'package:intern_link/screens/profile_screen.dart';
 import 'package:intern_link/screens/saved_items_screen.dart';
-import 'package:intern_link/service/json_data_service.dart';
+import 'package:intern_link/services/json_data_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final User currentUser;
@@ -141,26 +141,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ],
                         ),
-                        // GestureDetector(
-                        //   onTap: () {
-                        //     Navigator.push(
-                        //       context,
-                        //       MaterialPageRoute(
-                        //         builder: (context) => ProfileScreen(user: widget.currentUser),
-                        //       ),
-                        //     );
-                        //   },
-                        //   child: CircleAvatar(
-                        //     radius: 22,
-                        //     backgroundColor: Colors.white,
-                        //     child: CircleAvatar(
-                        //       radius: 20,
-                        //       backgroundImage: widget.currentUser.profile.profilePicture != null
-                        //           ? AssetImage(widget.currentUser.profile.profilePicture!)
-                        //           : const AssetImage('assets/images/default_profile.png'),
-                        //     ),
-                        //   ),
-                        // ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ProfileScreen(user: widget.currentUser),
+                              ),
+                            );
+                          },
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundColor: Colors.white,
+                            child: CircleAvatar(
+                              radius: 20,
+                              backgroundImage: widget.currentUser.profile.profilePicture != null
+                                  ? AssetImage(widget.currentUser.profile.profilePicture!)
+                                  : const AssetImage('assets/images/default_profile.png'),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -299,15 +299,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       TextButton(
                         onPressed: () {
-                          // Navigator.push(
-                          //   context,
-                          //   MaterialPageRoute(
-                          //     builder: (context) => SavedItemsScreen(
-                          //       savedListings: _savedListings,
-                          //       currentUser: widget.currentUser,
-                          //     ),
-                          //   ),
-                          // );
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SavedItemsScreen(
+                                savedListings: _savedListings,
+                                currentUser: widget.currentUser,
+                              ),
+                            ),
+                          );
                         },
                         child: const Text(
                           'See all',
@@ -453,22 +453,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () {
-                      // Navigator.push(
-                      //   context,
-                      //   MaterialPageRoute(
-                      //     builder: (context) => listing is Internship
-                      //         ? InternshipDetailScreen(
-                      //             internship: listing,
-                      //             onApply: () => _applyForListing(listing),
-                      //             isSaved: isSaved,
-                      //             onSaveToggle: () => _toggleSaved(listing.internshipId),
-                      //         : JobDetailScreen(
-                      //             job: listing,
-                      //             onApply: () => _applyForListing(listing),
-                      //             isSaved: isSaved,
-                      //             onSaveToggle: () => _toggleSaved(listing.jobId),
-                      //   ),
-                      // );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => listing is Internship
+                              ? InternshipDetailScreen(
+                                  internship: listing,
+                                  onApply: () => _applyForListing(listing),
+                                  isSaved: isSaved,
+                                  onSaveToggle: () => _toggleSaved(listing.internshipId),)
+                              : JobDetailScreen(
+                                  job: listing,
+                                  onApply: () => _applyForListing(listing),
+                                  isSaved: isSaved,
+                                  onSaveToggle: () => _toggleSaved(listing.jobId),
+                        ),
+                      ));
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -602,34 +602,32 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _currentIndex,
           onTap: (index) {
             if (index == 1) {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => SavedItemsScreen(
-              //       savedListings: _savedListings,
-              //       currentUser: widget.currentUser,
-              //     ),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SavedItemsScreen(
+                    savedListings: _savedListings,
+                    currentUser: widget.currentUser,
+                  ),
+                ),
+              );
             } else if (index == 2) {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => ApplicationStatusScreen(
-              //       applications: _savedListings
-              //           .where((item) => item.applicationsReceived
-              //               .any((app) => app.applicantId == widget.currentUser.userId))
-              //           .toList(),
-              //     ),
-              //   ),
-              // );
+              Navigator.push(
+  context,
+  MaterialPageRoute(
+    builder: (context) => ApplicationStatusScreen(
+      listings: _allListings,  // Use the class property
+      currentUser: widget.currentUser,  // Use the widget property
+    ),
+  ),
+);
             } else if (index == 3) {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => ProfileScreen(user: widget.currentUser),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(user: widget.currentUser),
+                ),
+              );
             } else {
               setState(() => _currentIndex = index);
             }
