@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:intern_link/models/user_model.dart';
@@ -57,125 +58,141 @@ class _LoginScreenState extends State<LoginScreen>
   }
 
   Future<void> _login() async {
-  setState(() {
-    _isLoading = true;
-    _errorMessage = '';
-  });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
 
-  try {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+    try {
+      final email = _emailController.text.trim();
+      final password = _passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Please enter both email and password');
+      if (email.isEmpty || password.isEmpty) {
+        setState(() {
+          _errorMessage = 'Please fill in all fields.';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final querySnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('email', isEqualTo: _emailController.text.trim())
+        .get();
+
+    if (querySnapshot.docs.isEmpty) {
+      setState(() {
+        _errorMessage = 'Invalid email or password.';
+        _isLoading = false;
+      });
       return;
     }
 
-    // Load users from JSON
-    final users = await JsonDataService.loadUsers();
-    
-    // Debug: Print loaded users to verify data
-    debugPrint('Loaded users: ${users.map((u) => u.email).toList()}');
+    final userData = querySnapshot.docs.first.data();
 
-    // Find matching user (case-sensitive comparison)
-    User? matchedUser;
-    try {
-      matchedUser = users.firstWhere(
-        (user) => user.email == email && user.password == password,
+    if (userData['password'] == _passwordController.text) {
+      Navigator.of(context).pushReplacement(
+        FadeTransitionPageRoute(page: HomeScreen(currentUser: userData)),
       );
-    } catch (e) {
-      debugPrint('User not found: $e');
+    } else {
+      setState(() {
+        _errorMessage = 'Invalid email or password.';
+        _isLoading = false;
+      });
     }
 
-    if (matchedUser != null) {
-      if (matchedUser.status == 'active') {
-        debugPrint('Login successful for: ${matchedUser.email}');
-        // Successful login
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Login Error: ${e.toString()}';
+      });
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+  try {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+    if (googleUser == null) return;
+
+    // Check if user already exists
+    final loginDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc('login')
+        .collection('credentials')
+        .doc(googleUser.email)
+        .get();
+
+    if (loginDoc.exists) {
+      // User exists - log them in
+      final userId = loginDoc.data()?['userId'] as String;
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      var data = userDoc.data() as Map<String, dynamic>;
+
+      if (userDoc.exists) {
         Navigator.of(context).pushReplacement(
           FadeTransitionPageRoute(
-            page: HomeScreen(currentUser: matchedUser),
-          ),
+            page: HomeScreen(currentUser: userDoc.data() as Map<String,dynamic>)
+            )
         );
       } else {
-        setState(() => _errorMessage = 'Your account is not active');
+        setState(() => _errorMessage = 'User data not found');
       }
-    } else {
-      debugPrint('Invalid credentials for: $email');
-      setState(() => _errorMessage = 'Invalid email or password');
+      return;
     }
+
+    // Create new user document
+    final newUserId = FirebaseFirestore.instance.collection('users').doc().id;
+    final newUser = {
+      'Education': '10th pass',
+      'Experience': 'Fresher',
+      'Skills': 'Dart, Flutter, Python',
+      'email': googleUser.email,
+      'jobSeeker': true,
+      'name': googleUser.displayName ?? 'Google User',
+      'password': 'google_auth', // Placeholder since password isn't needed
+      'profilePicture': googleUser.photoUrl ?? '',
+      'status': 'active',
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    // Add to users collection
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(newUserId)
+        .set(newUser);
+
+    // Add to login collection for email lookup
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc('login')
+        .collection('credentials')
+        .doc(googleUser.email)
+        .set({'userId': newUserId});
+
+    // Navigate to home screen with new user
+    Navigator.of(context).pushReplacement(
+      FadeTransitionPageRoute(
+        page: HomeScreen(
+          currentUser: newUser,
+        ),
+      ),
+    );
+
   } catch (e) {
-    debugPrint('Login error: $e');
-    setState(() => _errorMessage = 'An error occurred. Please try again.');
+    setState(() {
+      _errorMessage = 'Google Sign-In Error: ${e.toString()}';
+    });
   } finally {
     setState(() => _isLoading = false);
   }
 }
-
-  Future<void> _signInWithGoogle() async {
-    try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = '';
-      });
-
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-      if (googleUser == null) return;
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      
-      // In a real app, you would verify the Google token with your backend
-      // For JSON demo, we'll just check if the email exists in our users.json
-
-      final users = await JsonDataService.loadUsers();
-      final matchedUser = users.firstWhere(
-        (user) => user.email == googleUser.email,
-        orElse: () => User(
-          userId: '',
-          role: '',
-          name: '',
-          email: '',
-          password: '',
-          profile: UserProfile(),
-          status: '',
-        ),
-      );
-
-      if (matchedUser.userId.isEmpty) {
-        // Create a new user for demo purposes
-        final newUser = User(
-          userId: 'user_${DateTime.now().millisecondsSinceEpoch}',
-          role: 'job_seeker',
-          name: googleUser.displayName ?? 'Google User',
-          email: googleUser.email,
-          password: 'google_auth',
-          profile: UserProfile(
-            profilePicture: googleUser.photoUrl,
-          ),
-          status: 'active',
-        );
-
-        // In a real app, you would save this new user to your database
-        Navigator.of(context).pushReplacement(
-          FadeTransitionPageRoute(
-            page: HomeScreen(currentUser: newUser),
-          ),
-        );
-      } else {
-        Navigator.of(context).pushReplacement(
-          FadeTransitionPageRoute(
-            page: HomeScreen(currentUser: matchedUser),
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Google Sign-In Error: ${e.toString()}';
-      });
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -204,7 +221,6 @@ class _LoginScreenState extends State<LoginScreen>
                 ),
               ),
             ),
-
             SafeArea(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -313,7 +329,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: const BorderSide(
-                                        color: Color.fromARGB(255, 26, 60, 124)),
+                                        color:
+                                            Color.fromARGB(255, 26, 60, 124)),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
                                       vertical: 16, horizontal: 20),
@@ -353,7 +370,8 @@ class _LoginScreenState extends State<LoginScreen>
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(12),
                                     borderSide: const BorderSide(
-                                        color: Color.fromARGB(255, 26, 60, 124)),
+                                        color:
+                                            Color.fromARGB(255, 26, 60, 124)),
                                   ),
                                   contentPadding: const EdgeInsets.symmetric(
                                       vertical: 16, horizontal: 20),
@@ -462,7 +480,8 @@ class _LoginScreenState extends State<LoginScreen>
                                 width: double.infinity,
                                 height: 52,
                                 child: OutlinedButton.icon(
-                                  onPressed: _isLoading ? null : _signInWithGoogle,
+                                  onPressed:
+                                      _isLoading ? null : _signInWithGoogle,
                                   icon: Image.asset(
                                     'assets/images/google.png',
                                     height: 24,
