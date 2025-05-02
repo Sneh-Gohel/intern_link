@@ -1,22 +1,21 @@
-// TODO Implement this library.
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:intern_link/models/job_model.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class JobDetailScreen extends StatefulWidget {
-  final Job job;
+  final Map<String, dynamic> job;
   final bool isSaved;
   final VoidCallback onApply;
   final VoidCallback onSaveToggle;
 
   const JobDetailScreen({
-    Key? key,
+    super.key,
     required this.job,
     required this.isSaved,
     required this.onApply,
     required this.onSaveToggle,
-  }) : super(key: key);
+  });
 
   @override
   State<JobDetailScreen> createState() => _JobDetailScreenState();
@@ -45,10 +44,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    job.companyLogo,
+                  CachedNetworkImage(
+                    imageUrl: job['companyLogo'] ?? '',
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    placeholder: (context, url) => Container(
+                      color: const Color.fromARGB(255, 197, 218, 243),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       color: const Color.fromARGB(255, 197, 218, 243),
                     ),
                   ),
@@ -109,7 +111,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          job.title,
+                          job['title'] ?? 'No Title',
                           style: theme.textTheme.headlineSmall?.copyWith(
                             color: const Color.fromARGB(255, 26, 60, 124),
                             fontWeight: FontWeight.bold,
@@ -124,7 +126,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          job.status.toUpperCase(),
+                          (job['status'] ?? 'open').toUpperCase(),
                           style: const TextStyle(
                             color: Color.fromARGB(255, 107, 146, 230),
                             fontWeight: FontWeight.bold,
@@ -136,14 +138,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Posted by ${job.postedBy}',
+                    'Posted by ${job['companyName'] ?? 'Unknown Company'}',
                     style: TextStyle(
                       color: Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // Job Details Tabs
                   Container(
                     decoration: BoxDecoration(
                       color: const Color.fromARGB(255, 229, 239, 255),
@@ -152,21 +152,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                     padding: const EdgeInsets.all(4),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: _buildDetailTab('Overview', 0),
-                        ),
-                        Expanded(
-                          child: _buildDetailTab('Requirements', 1),
-                        ),
-                        Expanded(
-                          child: _buildDetailTab('Benefits', 2),
-                        ),
+                        Expanded(child: _buildDetailTab('Overview', 0)),
+                        Expanded(child: _buildDetailTab('Requirements', 1)),
+                        Expanded(child: _buildDetailTab('Benefits', 2)),
                       ],
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // Tab Content
                   IndexedStack(
                     index: _currentTab,
                     children: [
@@ -174,11 +166,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDetailItem(Iconsax.money, 'Salary', job.salary),
-                          _buildDetailItem(
-                              Iconsax.location, 'Location', job.location),
-                          _buildDetailItem(Iconsax.calendar, 'Last Date',
-                              'Apply by ${job.lastDate}'),
+                          _buildDetailItem(Iconsax.money, 'Salary', job['salary'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.location, 'Location', job['location'] ?? 'Remote'),
+                          _buildDetailItem(Iconsax.calendar, 'Last Date', 'Apply by ${job['lastDate'] ?? 'Not specified'}'),
                           const SizedBox(height: 20),
                           Text(
                             'Job Description',
@@ -189,7 +179,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            job.description,
+                            job['JD'] ?? 'No job description available',
                             style: TextStyle(
                               color: Colors.grey.shade700,
                               height: 1.5,
@@ -197,17 +187,13 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                         ],
                       ),
-
                       // Requirements Tab
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDetailItem(
-                              Iconsax.book, 'Education', job.eligibility),
-                          _buildDetailItem(Iconsax.cpu, 'Skills Required',
-                              'Flutter, Dart, Firebase, REST APIs'),
-                          _buildDetailItem(Iconsax.briefcase, 'Experience',
-                              '2+ years in mobile development'),
+                          _buildDetailItem(Iconsax.book, 'Education', job['education'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.cpu, 'Skills Required', job['skillsRequired'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.briefcase, 'Experience', job['experience'] ?? 'Not specified'),
                           const SizedBox(height: 20),
                           Text(
                             'Additional Requirements',
@@ -218,10 +204,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            '• Strong understanding of state management\n'
-                            '• Experience with CI/CD pipelines\n'
-                            '• Familiarity with Agile methodologies\n'
-                            '• Portfolio of published apps',
+                            (job['AR'] as List?)?.map((item) => '• $item').join('\n') ?? 'No additional requirements',
                             style: TextStyle(
                               color: Colors.grey.shade700,
                               height: 1.5,
@@ -229,18 +212,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                         ],
                       ),
-
                       // Benefits Tab
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildBulletPoint(
-                              'Competitive salary and bonus structure'),
-                          _buildBulletPoint('Health insurance coverage'),
-                          _buildBulletPoint('Flexible work hours'),
-                          _buildBulletPoint('Remote work options'),
-                          _buildBulletPoint('Professional development budget'),
-                          _buildBulletPoint('Generous vacation policy'),
+                          ...(job['benefits'] as List?)?.map((benefit) => _buildBulletPoint(benefit)) ?? 
+                              [_buildBulletPoint('No benefits information available')],
                           const SizedBox(height: 20),
                           Text(
                             'Company Culture',
@@ -251,7 +228,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'We foster a collaborative environment where creativity and innovation thrive. Our team values work-life balance and continuous learning.',
+                            job['companyDescription'] ?? 'No company culture information available',
                             style: TextStyle(
                               color: Colors.grey.shade700,
                               height: 1.5,
@@ -261,7 +238,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 30),
                 ],
               ),
             ),
@@ -275,14 +251,16 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             Expanded(
               child: OutlinedButton(
                 onPressed: () async {
-                  final uri = Uri.parse('https://${job.postedBy}.com');
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Could not launch website')),
-                    );
+                  if (job['website'] != null) {
+                    final uri = Uri.parse(job['website']);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                      return;
+                    }
                   }
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not launch website')),
+                  );
                 },
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -306,17 +284,14 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
               child: ElevatedButton(
                 onPressed: () async {
                   setState(() => _isApplying = true);
-                  await Future.delayed(const Duration(seconds: 1)); // Simulate apply
+                  await Future.delayed(const Duration(seconds: 1));
                   widget.onApply();
                   setState(() => _isApplying = false);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('Application submitted successfully!'),
                       behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      backgroundColor: Colors.green.shade600,
+                      backgroundColor: Colors.green,
                     ),
                   );
                 },

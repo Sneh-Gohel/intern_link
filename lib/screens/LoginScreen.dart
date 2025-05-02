@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:intern_link/models/user_model.dart';
 import 'package:intern_link/screens/HomeScreen.dart';
 import 'package:intern_link/screens/SignupScreen.dart';
 import 'package:intern_link/services/FadeTransitionPageRoute.dart';
-import 'package:intern_link/services/json_data_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);

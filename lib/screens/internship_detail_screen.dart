@@ -1,30 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:intern_link/models/internship_model.dart';
-import 'package:intern_link/models/user_model.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class InternshipDetailScreen extends StatefulWidget {
-  final Internship internship;
+  final Map<String, dynamic> internship;
   final bool isSaved;
   final VoidCallback onApply;
   final VoidCallback onSaveToggle;
 
   const InternshipDetailScreen({
-    Key? key,
+    super.key,
     required this.internship,
     required this.isSaved,
     required this.onApply,
     required this.onSaveToggle,
-  }) : super(key: key);
+  });
 
   @override
   State<InternshipDetailScreen> createState() => _InternshipDetailScreenState();
 }
 
 class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
-  bool _isExpanded = false;
   bool _isApplying = false;
+  int _currentTab = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -44,10 +42,13 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
               background: Stack(
                 fit: StackFit.expand,
                 children: [
-                  Image.asset(
-                    internship.companyLogo,
+                  CachedNetworkImage(
+                    imageUrl: internship['companyLogo'] ?? '',
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    placeholder: (context, url) => Container(
+                      color: const Color.fromARGB(255, 197, 218, 243),
+                    ),
+                    errorWidget: (context, url, error) => Container(
                       color: const Color.fromARGB(255, 197, 218, 243),
                     ),
                   ),
@@ -108,7 +109,7 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          internship.title,
+                          internship['title'] ?? 'No Title',
                           style: theme.textTheme.headlineSmall?.copyWith(
                             color: const Color.fromARGB(255, 26, 60, 124),
                             fontWeight: FontWeight.bold,
@@ -123,7 +124,7 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          internship.status.toUpperCase(),
+                          (internship['status'] ?? 'open').toUpperCase(),
                           style: const TextStyle(
                             color: Color.fromARGB(255, 107, 146, 230),
                             fontWeight: FontWeight.bold,
@@ -135,111 +136,85 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Posted by ${internship.postedBy}',
+                    'Posted by ${internship['companyName'] ?? 'Unknown Company'}',
                     style: TextStyle(
                       color: Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 20),
-                  Row(
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color.fromARGB(255, 229, 239, 255),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(4),
+                    child: Row(
+                      children: [
+                        Expanded(child: _buildDetailTab('Overview', 0)),
+                        Expanded(child: _buildDetailTab('Details', 1)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  IndexedStack(
+                    index: _currentTab,
                     children: [
-                      _buildDetailChip(
-                        Iconsax.money,
-                        internship.stipend,
-                        const Color.fromARGB(255, 229, 239, 255),
-                      ),
-                      const SizedBox(width: 10),
-                      _buildDetailChip(
-                        Iconsax.location,
-                        internship.location,
-                        const Color.fromARGB(255, 229, 239, 255),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      _buildDetailChip(
-                        Iconsax.clock,
-                        '3 months', // Adjust duration as needed
-                        const Color.fromARGB(255, 229, 239, 255),
-                      ),
-                      const SizedBox(width: 10),
-                      _buildDetailChip(
-                        Iconsax.calendar,
-                        'Apply by ${internship.lastDate}',
-                        const Color.fromARGB(255, 229, 239, 255),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    'About the Internship',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color.fromARGB(255, 26, 60, 124),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    internship.description,
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  Text(
-                    'Eligibility Criteria',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: const Color.fromARGB(255, 26, 60, 124),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    internship.eligibility,
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                  ExpansionPanelList(
-                    elevation: 0,
-                    expandedHeaderPadding: EdgeInsets.zero,
-                    expansionCallback: (index, isExpanded) {
-                      setState(() => _isExpanded = !isExpanded);
-                    },
-                    children: [
-                      ExpansionPanel(
-                        headerBuilder: (context, isExpanded) {
-                          return const ListTile(
-                            title: Text(
-                              'Additional Information',
-                              style: TextStyle(
-                                color: Color.fromARGB(255, 26, 60, 124),
-                                fontWeight: FontWeight.bold,
-                              ),
+                      // Overview Tab
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildDetailItem(
+                              Iconsax.money, 'Stipend', internship['stipend'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.location, 'Location', 
+                              internship['location'] ?? 'Remote'),
+                          _buildDetailItem(Iconsax.calendar, 'Apply By', 
+                              'Apply by ${internship['applyBy'] ?? 'Not specified'}'),
+                          const SizedBox(height: 20),
+                          Text(
+                            'About the Internship',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: const Color.fromARGB(255, 26, 60, 124),
+                              fontWeight: FontWeight.bold,
                             ),
-                          );
-                        },
-                        body: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildInfoItem('Start Date', 'Immediate'),
-                            _buildInfoItem('Duration', '3 months'),
-                            _buildInfoItem('Work Mode', internship.location == 'Remote' 
-                                ? 'Remote' 
-                                : 'On-site'),
-                            _buildInfoItem('Skills Required', 'Flutter, Dart, Firebase'),
-                          ],
-                        ),
-                        isExpanded: _isExpanded,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            internship['about'] ?? 'No description available',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Details Tab
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildDetailItem(Iconsax.clock, 'Duration', 
+                              internship['duration'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.calendar_tick, 'Start Date', 
+                              internship['startDate'] ?? 'Flexible'),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Eligibility Criteria',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: const Color.fromARGB(255, 26, 60, 124),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            internship['eligibility'] ?? 'No eligibility criteria specified',
+                            style: TextStyle(
+                              color: Colors.grey.shade700,
+                              height: 1.5,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 40),
                 ],
               ),
             ),
@@ -248,131 +223,80 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () async {
-                  final uri = Uri.parse('https://${internship.postedBy}.com');
-                  if (false) {
-                    // await launchUrl(uri);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Could not launch website')),
-                    );
-                  }
-                },
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  side: const BorderSide(
-                    color: Color.fromARGB(255, 107, 146, 230),
-                  ),
-                ),
-                child: const Text(
-                  'Visit Website',
-                  style: TextStyle(
-                    color: Color.fromARGB(255, 107, 146, 230),
-                  ),
-                ),
+        child: ElevatedButton(
+          onPressed: () async {
+            setState(() => _isApplying = true);
+            await Future.delayed(const Duration(seconds: 1));
+            widget.onApply();
+            setState(() => _isApplying = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Application submitted successfully!'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.green,
               ),
+            );
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color.fromARGB(255, 107, 146, 230),
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: ElevatedButton(
-                onPressed: () async {
-                  setState(() => _isApplying = true);
-                  await Future.delayed(const Duration(seconds: 1)); // Simulate apply
-                  widget.onApply();
-                  setState(() => _isApplying = false);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Application submitted successfully!'),
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      backgroundColor: Colors.green.shade600,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color.fromARGB(255, 107, 146, 230),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+          ),
+          child: _isApplying
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
                   ),
+                )
+              : const Text(
+                  'Apply Now',
+                  style: TextStyle(color: Colors.white),
                 ),
-                child: _isApplying
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Text(
-                        'Apply Now',
-                        style: TextStyle(color: Colors.white),
-                      ),
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildDetailChip(IconData icon, String text, Color bgColor) {
-    return Expanded(
+  Widget _buildDetailTab(String title, int index) {
+    return GestureDetector(
+      onTap: () => setState(() => _currentTab = index),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(12),
+          color: _currentTab == index
+              ? const Color.fromARGB(255, 107, 146, 230)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: const Color.fromARGB(255, 107, 146, 230),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                text,
-                style: const TextStyle(
-                  color: Color.fromARGB(255, 26, 60, 124),
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+        child: Text(
+          title,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: _currentTab == index ? Colors.white : const Color.fromARGB(255, 26, 60, 124),
+            fontWeight: FontWeight.w500,
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildInfoItem(String title, String value) {
+  Widget _buildDetailItem(IconData icon, String title, String value) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 8,
-            height: 8,
-            margin: const EdgeInsets.only(top: 6, right: 10),
-            decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 107, 146, 230),
-              shape: BoxShape.circle,
-            ),
+          Icon(
+            icon,
+            size: 20,
+            color: const Color.fromARGB(255, 107, 146, 230),
           ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -384,6 +308,7 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(

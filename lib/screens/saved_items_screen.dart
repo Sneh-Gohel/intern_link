@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:intern_link/models/internship_model.dart';
-import 'package:intern_link/models/job_model.dart';
-import 'package:intern_link/models/user_model.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intern_link/screens/internship_detail_screen.dart';
 import 'package:intern_link/screens/job_detail_screen.dart';
 
 class SavedItemsScreen extends StatefulWidget {
-  final List<dynamic> savedListings;
-  final User currentUser;
+  final List<Map<String, dynamic>> savedListings;
+  final Map<String, dynamic> currentUser;
 
   const SavedItemsScreen({
     Key? key,
@@ -22,12 +21,109 @@ class SavedItemsScreen extends StatefulWidget {
 
 class _SavedItemsScreenState extends State<SavedItemsScreen> {
   int _activeTab = 0; // 0 = Internships, 1 = Jobs
+  bool _isLoading = false;
+
+  // Separate internships and jobs from saved listings
+  List<Map<String, dynamic>> get _savedInternships {
+    return widget.savedListings
+        .where((item) => item['type'] == 'internship')
+        .toList();
+  }
+
+  List<Map<String, dynamic>> get _savedJobs {
+    return widget.savedListings.where((item) => item['type'] == 'job').toList();
+  }
+
+  Future<void> _removeSavedItem(String id) async {
+    setState(() => _isLoading = true);
+    try {
+      final saved = List<String>.from(widget.currentUser['saved'] ?? []);
+      saved.remove(id);
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUser['userId'])
+          .update({'saved': saved});
+
+      setState(() {
+        widget.currentUser['saved'] = saved;
+        widget.savedListings.removeWhere((item) => item['id'] == id);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: const Text('Removed from saved items'),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        backgroundColor: Colors.green.shade600,
+      ));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error removing item: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<Map<String, dynamic>> _getCompanyData(String userId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      return doc.data() ?? {};
+    } catch (e) {
+      print('Error loading company data: $e');
+      return {};
+    }
+  }
+
+  void _applyForListing(Map<String, dynamic> listing) async {
+    try {
+      // Update in internship/job collection
+      await FirebaseFirestore.instance
+          .collection(listing['type'] == 'internship' ? 'internship' : 'jobs')
+          .doc(listing['id'])
+          .collection('activities')
+          .doc('lists')
+          .update({
+        '${widget.currentUser['userId']}': 'requested',
+      });
+
+      // Update in user's applied collection
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUser['userId'])
+          .collection('applied')
+          .doc(listing['type'])
+          .update({
+        listing['id']: 'requested',
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Applied for ${listing['title']}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error applying: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final savedInternships = widget.savedListings.whereType<Internship>().toList();
-    final savedJobs = widget.savedListings.whereType<Job>().toList();
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FF),
       body: CustomScrollView(
@@ -47,7 +143,8 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(70),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: Column(
                   children: [
                     Container(
@@ -73,9 +170,20 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
               ),
             ),
           ),
-          _activeTab == 0
-              ? _buildInternshipsList(savedInternships)
-              : _buildJobsList(savedJobs),
+          _isLoading
+              ? SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: CircularProgressIndicator(
+                        color: const Color.fromARGB(255, 107, 146, 230),
+                      ),
+                    ),
+                  ),
+                )
+              : _activeTab == 0
+                  ? _buildInternshipsList()
+                  : _buildJobsList(),
         ],
       ),
     );
@@ -106,31 +214,31 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
     );
   }
 
-  SliverList _buildInternshipsList(List<Internship> internships) {
+  SliverList _buildInternshipsList() {
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          final internship = internships[index];
+          final internship = _savedInternships[index];
           return _buildSavedInternshipCard(internship);
         },
-        childCount: internships.length,
+        childCount: _savedInternships.length,
       ),
     );
   }
 
-  SliverList _buildJobsList(List<Job> jobs) {
+  SliverList _buildJobsList() {
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          final job = jobs[index];
+          final job = _savedJobs[index];
           return _buildSavedJobCard(job);
         },
-        childCount: jobs.length,
+        childCount: _savedJobs.length,
       ),
     );
   }
 
-  Widget _buildSavedInternshipCard(Internship internship) {
+  Widget _buildSavedInternshipCard(Map<String, dynamic> internship) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 15),
       decoration: BoxDecoration(
@@ -151,17 +259,30 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
             leading: CircleAvatar(
               radius: 25,
               backgroundColor: const Color(0xFFF5F9FF),
-              backgroundImage: AssetImage(internship.companyLogo),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: internship['companyLogo'] ?? '',
+                  fit: BoxFit.cover,
+                  width: 50,
+                  height: 50,
+                  errorWidget: (context, url, error) => Image.asset(
+                    'assets/images/default_company.png',
+                    fit: BoxFit.cover,
+                    width: 50,
+                    height: 50,
+                  ),
+                ),
+              ),
             ),
             title: Text(
-              internship.title,
+              internship['title'] ?? 'No Title',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Color.fromARGB(255, 26, 60, 124),
               ),
             ),
             subtitle: Text(
-              internship.postedBy,
+              internship['companyName'] ?? 'Unknown Company',
               style: TextStyle(color: Colors.grey.shade600),
             ),
             trailing: IconButton(
@@ -169,7 +290,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                 Iconsax.bookmark_25,
                 color: Color.fromARGB(255, 107, 146, 230),
               ),
-              onPressed: () => _removeSavedItem(internship.internshipId),
+              onPressed: () => _removeSavedItem(internship['id']),
             ),
           ),
           Padding(
@@ -178,19 +299,22 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
               children: [
                 Row(
                   children: [
-                    _buildDetailChip(Iconsax.money, internship.stipend),
+                    _buildDetailChip(Iconsax.money,
+                        internship['stipend'] ?? 'Not specified'),
                     const SizedBox(width: 10),
-                    _buildDetailChip(Iconsax.location, internship.location),
+                    _buildDetailChip(
+                        Iconsax.location, internship['location'] ?? 'Remote'),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    _buildDetailChip(Iconsax.clock, "3 months"),
+                    _buildDetailChip(Iconsax.clock,
+                        internship['duration'] ?? 'Not specified'),
                     const SizedBox(width: 10),
                     _buildDetailChip(
                       Iconsax.calendar,
-                      'Apply by ${internship.lastDate}',
+                      'Apply by ${internship['applyBy'] ?? 'Not specified'}',
                     ),
                   ],
                 ),
@@ -211,8 +335,9 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                           builder: (context) => InternshipDetailScreen(
                             internship: internship,
                             isSaved: true,
-                            onApply: () {},
-                            onSaveToggle: () => _removeSavedItem(internship.internshipId),
+                            onApply: () => _applyForListing(internship),
+                            onSaveToggle: () =>
+                                _removeSavedItem(internship['id']),
                           ),
                         ),
                       );
@@ -237,9 +362,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Apply now action
-                    },
+                    onPressed: () => _applyForListing(internship),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 107, 146, 230),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -262,7 +385,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
     );
   }
 
-  Widget _buildSavedJobCard(Job job) {
+  Widget _buildSavedJobCard(Map<String, dynamic> job) {
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 15),
       decoration: BoxDecoration(
@@ -283,17 +406,30 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
             leading: CircleAvatar(
               radius: 25,
               backgroundColor: const Color(0xFFF5F9FF),
-              backgroundImage: AssetImage(job.companyLogo),
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: job['companyLogo'] ?? '',
+                  fit: BoxFit.cover,
+                  width: 50,
+                  height: 50,
+                  errorWidget: (context, url, error) => Image.asset(
+                    'assets/images/default_company.png',
+                    fit: BoxFit.cover,
+                    width: 50,
+                    height: 50,
+                  ),
+                ),
+              ),
             ),
             title: Text(
-              job.title,
+              job['title'] ?? 'No Title',
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Color.fromARGB(255, 26, 60, 124),
               ),
             ),
             subtitle: Text(
-              job.postedBy,
+              job['companyName'] ?? 'Unknown Company',
               style: TextStyle(color: Colors.grey.shade600),
             ),
             trailing: IconButton(
@@ -301,7 +437,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                 Iconsax.bookmark_25,
                 color: Color.fromARGB(255, 107, 146, 230),
               ),
-              onPressed: () => _removeSavedItem(job.jobId),
+              onPressed: () => _removeSavedItem(job['id']),
             ),
           ),
           Padding(
@@ -310,9 +446,11 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
               children: [
                 Row(
                   children: [
-                    _buildDetailChip(Iconsax.money, job.salary),
+                    _buildDetailChip(
+                        Iconsax.money, job['salary'] ?? 'Not specified'),
                     const SizedBox(width: 10),
-                    _buildDetailChip(Iconsax.location, job.location),
+                    _buildDetailChip(
+                        Iconsax.location, job['location'] ?? 'Remote'),
                   ],
                 ),
                 const SizedBox(height: 10),
@@ -322,7 +460,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                     const SizedBox(width: 10),
                     _buildDetailChip(
                       Iconsax.calendar,
-                      'Apply by ${job.lastDate}',
+                      'Apply by ${job['lastDate'] ?? 'Not specified'}',
                     ),
                   ],
                 ),
@@ -343,8 +481,8 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                           builder: (context) => JobDetailScreen(
                             job: job,
                             isSaved: true,
-                            onApply: () {},
-                            onSaveToggle: () => _removeSavedItem(job.jobId),
+                            onApply: () => _applyForListing(job),
+                            onSaveToggle: () => _removeSavedItem(job['id']),
                           ),
                         ),
                       );
@@ -369,9 +507,7 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () {
-                      // Apply now action
-                    },
+                    onPressed: () => _applyForListing(job),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 107, 146, 230),
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -425,22 +561,5 @@ class _SavedItemsScreenState extends State<SavedItemsScreen> {
         ),
       ),
     );
-  }
-
-  void _removeSavedItem(String id) {
-    setState(() {
-      widget.currentUser.profile.savedJobs?.remove(id);
-      // In a real app, you would update this in your database
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Removed from saved items'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          backgroundColor: Colors.green.shade600,
-        ),
-      );
-    });
   }
 }

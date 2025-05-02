@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intern_link/screens/internship_detail_screen.dart';
+import 'package:intern_link/screens/job_detail_screen.dart';
+import 'package:intern_link/screens/saved_items_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final Map<String, dynamic> currentUser;
@@ -34,7 +37,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .where('status', isEqualTo: 'open')
           .get();
 
-      _internships = await Future.wait(internshipsSnapshot.docs.map((doc) async {
+      _internships =
+          await Future.wait(internshipsSnapshot.docs.map((doc) async {
         final data = doc.data();
         print('Internship data: $data');
 
@@ -162,7 +166,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Map<String, dynamic>> get _savedListings {
     final savedIds = List<String>.from(widget.currentUser['saved'] ?? []);
-    return [..._internships, ..._jobs].where((item) => savedIds.contains(item['id'])).toList();
+    return [..._internships, ..._jobs]
+        .where((item) => savedIds.contains(item['id']))
+        .toList();
   }
 
   bool _isSaved(String listingId) {
@@ -227,9 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             backgroundColor: Colors.white,
                             child: CircleAvatar(
                               radius: 20,
-                              backgroundImage: widget.currentUser['profilePicture'] != null
-                                  ? CachedNetworkImageProvider(widget.currentUser['profilePicture'])
-                                  : const AssetImage('assets/images/default_profile.png') as ImageProvider,
+                              backgroundImage: widget
+                                          .currentUser['profilePicture'] !=
+                                      null
+                                  ? CachedNetworkImageProvider(
+                                      widget.currentUser['profilePicture'])
+                                  : const AssetImage(
+                                          'assets/images/default_profile.png')
+                                      as ImageProvider,
                             ),
                           ),
                         ),
@@ -242,7 +253,8 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(75),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
@@ -250,7 +262,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     fillColor: Colors.white,
                     hintText: 'Search internships, jobs...',
                     hintStyle: TextStyle(color: Colors.grey.shade400),
-                    prefixIcon: Icon(Iconsax.search_normal, color: Colors.grey.shade600),
+                    prefixIcon: Icon(Iconsax.search_normal,
+                        color: Colors.grey.shade600),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(15),
                       borderSide: BorderSide.none,
@@ -326,9 +339,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               _showInternships = true;
                             });
                           },
-                          selectedColor: const Color.fromARGB(255, 107, 146, 230),
+                          selectedColor:
+                              const Color.fromARGB(255, 107, 146, 230),
                           labelStyle: TextStyle(
-                            color: _showInternships ? Colors.white : Colors.black,
+                            color:
+                                _showInternships ? Colors.white : Colors.black,
                           ),
                         ),
                       ),
@@ -342,9 +357,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               _showInternships = false;
                             });
                           },
-                          selectedColor: const Color.fromARGB(255, 107, 146, 230),
+                          selectedColor:
+                              const Color.fromARGB(255, 107, 146, 230),
                           labelStyle: TextStyle(
-                            color: !_showInternships ? Colors.white : Colors.black,
+                            color:
+                                !_showInternships ? Colors.white : Colors.black,
                           ),
                         ),
                       ),
@@ -358,7 +375,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        _showInternships ? 'Featured Internships' : 'Featured Jobs',
+                        _showInternships
+                            ? 'Featured Internships'
+                            : 'Featured Jobs',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -410,7 +429,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     )
                   : SliverList(
                       delegate: SliverChildBuilderDelegate(
-                        (context, index) => _buildListingCard(_displayedListings[index]),
+                        (context, index) =>
+                            _buildListingCard(_displayedListings[index]),
                         childCount: _displayedListings.length,
                       ),
                     ),
@@ -446,7 +466,8 @@ class _HomeScreenState extends State<HomeScreen> {
               backgroundColor: const Color(0xFFF5F9FF),
               backgroundImage: listing['companyLogo'] != null
                   ? CachedNetworkImageProvider(listing['companyLogo'])
-                  : const AssetImage('assets/images/default_company.png') as ImageProvider,
+                  : const AssetImage('assets/images/default_company.png')
+                      as ImageProvider,
             ),
             title: Text(
               listing['title'],
@@ -507,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _viewDetails(listing),
+                    onPressed: () => _viewDetails(listing,_showInternships),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -550,7 +571,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCategoryCard(IconData icon, String title, Color bgColor, Color iconColor) {
+  Widget _buildCategoryCard(
+      IconData icon, String title, Color bgColor, Color iconColor) {
     return Container(
       width: 90,
       margin: const EdgeInsets.only(right: 15),
@@ -602,7 +624,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: const Color.fromARGB(255, 107, 146, 230)),
+            Icon(icon,
+                size: 16, color: const Color.fromARGB(255, 107, 146, 230)),
             const SizedBox(width: 5),
             Flexible(
               child: Text(
@@ -638,15 +661,15 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _currentIndex,
           onTap: (index) {
             if (index == 1) {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => SavedItemsScreen(
-              //       savedListings: _savedListings,
-              //       currentUser: widget.currentUser,
-              //     ),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SavedItemsScreen(
+                    savedListings: _savedListings,
+                    currentUser: widget.currentUser,
+                  ),
+                ),
+              );
             } else if (index == 2) {
               // Navigator.push(
               //   context,
@@ -691,7 +714,9 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Applications',
             ),
             BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 3 ? Iconsax.profile_2user5 : Iconsax.profile_2user),
+              icon: Icon(_currentIndex == 3
+                  ? Iconsax.profile_2user5
+                  : Iconsax.profile_2user),
               label: 'Profile',
             ),
           ],
@@ -708,7 +733,32 @@ class _HomeScreenState extends State<HomeScreen> {
     // Implement saved items navigation
   }
 
-  void _viewDetails(Map<String, dynamic> listing) {
-    // Implement details navigation
+  void _viewDetails(Map<String, dynamic> listing,bool internship) {
+    if(internship){
+       Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => InternshipDetailScreen(
+          internship: listing,
+          isSaved: _isSaved(listing['id']),
+          onApply: () => _applyForListing(listing),
+          onSaveToggle: () => _toggleSaved(listing['id']),
+        ),
+      ),
+    );
+    }else{
+      Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JobDetailScreen(
+          job: listing,
+          isSaved: _isSaved(listing['id']),
+          onApply: () => _applyForListing(listing),
+          onSaveToggle: () => _toggleSaved(listing['id']),
+        ),
+      ),
+    );
+    }
+
   }
 }
