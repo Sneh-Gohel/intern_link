@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intern_link/screens/application_status_screen.dart';
 import 'package:intern_link/screens/internship_detail_screen.dart';
 import 'package:intern_link/screens/job_detail_screen.dart';
 import 'package:intern_link/screens/saved_items_screen.dart';
@@ -133,8 +134,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _applyForListing(Map<String, dynamic> listing) {
-    FirebaseFirestore.instance
-        .collection(listing['type'] == 'internship' ? 'internships' : 'jobs')
+    try{
+      FirebaseFirestore.instance
+        .collection(listing['type'] == 'internship' ? 'internship' : 'jobs')
         .doc(listing['id'])
         .collection('activities')
         .doc('lists')
@@ -158,6 +160,9 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: Colors.green,
       ),
     );
+    } catch(e){
+      print('Error applying for listing: $e');
+    }
   }
 
   List<Map<String, dynamic>> get _displayedListings {
@@ -671,15 +676,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             } else if (index == 2) {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => ApplicationStatusScreen(
-              //       listings: [..._internships, ..._jobs],
-              //       currentUser: widget.currentUser,
-              //     ),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ApplicationStatusScreen(
+                    currentUser: widget.currentUser,
+                  ),
+                ),
+              );
             } else if (index == 3) {
               // Navigator.push(
               //   context,
