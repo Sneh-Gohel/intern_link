@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intern_link/models/user_model.dart';
+import 'package:file_picker/file_picker.dart'; // Changed from image_picker
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'package:intern_link/services/apikeys.dart';
+import 'package:path/path.dart' as path;
+import 'package:crypto/crypto.dart';
 import 'package:intern_link/screens/LoginScreen.dart';
 import 'package:intern_link/services/FadeTransitionPageRoute.dart';
-import 'package:intern_link/services/auth_service.dart';
-import 'package:intern_link/services/json_data_service.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -14,12 +17,14 @@ class SignupScreen extends StatefulWidget {
   State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderStateMixin {
+class _SignupScreenState extends State<SignupScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
   final TextEditingController _skillsController = TextEditingController();
   final TextEditingController _experienceController = TextEditingController();
   final TextEditingController _educationController = TextEditingController();
@@ -79,24 +84,79 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        if (_userType == 'job_seeker') {
-          _profileImage = File(pickedFile.path);
-        } else {
-          _companyLogo = File(pickedFile.path);
+    try {
+      final pickedFile = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowCompression: true,
+      );
+
+      if (pickedFile != null) {
+        final file = File(pickedFile.files.single.path!);
+        final fileSize = await file.length() / (1024 * 1024);
+
+        if (fileSize > 3) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image size should be less than 3MB'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
         }
-      });
+
+        setState(() {
+          if (_userType == 'job_seeker') {
+            _profileImage = file;
+          } else {
+            _companyLogo = file;
+          }
+        });
+      }
+    } catch (e) {
+      print('Error picking image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error selecting image'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _pickResume() async {
-    final pickedFile = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (pickedFile != null) {
-      setState(() {
-        _resumeFile = File(pickedFile.path);
-      });
+    try {
+      final pickedFile = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        allowCompression: true,
+      );
+
+      if (pickedFile != null) {
+        final file = File(pickedFile.files.single.path!);
+        final fileSize = await file.length() / (1024 * 1024);
+
+        if (fileSize > 3) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Resume size should be less than 3MB'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _resumeFile = file;
+        });
+      }
+    } catch (e) {
+      print('Error picking resume: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error selecting resume'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -109,87 +169,260 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
     }
   }
 
-  Future<void> _submitForm() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<String?> _uploadToCloudinary(File file, String folder) async {
+    try {
+      print('Starting Cloudinary upload for folder: $folder');
 
-    if (_userType == 'job_seeker' && _resumeFile == null) {
+      final cloudinaryUrl =
+          'https://api.cloudinary.com/v1_1/${ApiKeys.getCloudName()}/upload';
+      final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final fileExtension = path.extension(file.path).toLowerCase();
+      final isPdf = fileExtension == '.pdf';
+
+      // Parameters to sign (only folder and timestamp)
+      final paramsToSign = {
+        'timestamp': timestamp,
+        'folder': folder,
+      };
+
+      // Sort parameters alphabetically
+      final sortedKeys = paramsToSign.keys.toList()..sort();
+      final paramString =
+          sortedKeys.map((key) => '$key=${paramsToSign[key]}').join('&');
+      final stringToSign = '$paramString${ApiKeys.getSecret()}';
+
+      print('String to sign: $stringToSign');
+
+      final signature = sha1.convert(utf8.encode(stringToSign)).toString();
+
+      print('Creating multipart request');
+      final request = http.MultipartRequest('POST', Uri.parse(cloudinaryUrl));
+
+      // Add all required fields
+      request.fields.addAll({
+        'timestamp': timestamp,
+        'api_key': ApiKeys.getKey(),
+        'signature': signature,
+        'folder': folder,
+        if (isPdf)
+          'resource_type': 'raw', // Only add to request, not to signature
+      });
+
+      print('Adding file to request');
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        file.path,
+        filename: path.basename(file.path),
+      ));
+
+      print('Sending request to Cloudinary');
+      final response = await request.send();
+      final responseData = await response.stream.bytesToString();
+      final jsonResponse = json.decode(responseData) as Map<String, dynamic>;
+
+      print('Cloudinary response: ${response.statusCode}');
+      print('Cloudinary response data: $jsonResponse');
+
+      if (response.statusCode == 200) {
+        print('Upload successful, URL: ${jsonResponse['secure_url']}');
+        return jsonResponse['secure_url'] as String;
+      } else {
+        throw Exception(
+            'Failed to upload: ${jsonResponse['error']?.toString() ?? 'Unknown error'}');
+      }
+    } catch (e) {
+      print('Error uploading to Cloudinary: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please upload your resume'),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          backgroundColor: Colors.red.shade600,
+          content: Text('Error uploading file: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return null;
+    }
+  }
+
+  String _generateCloudinarySignature(String timestamp) {
+    print('Generating Cloudinary signature');
+    final params = 'folder=uploads&timestamp=$timestamp${ApiKeys.getSecret()}';
+    return sha256.convert(utf8.encode(params)).toString();
+  }
+
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
+      return;
+    }
+
+    if (_userType == 'job_seeker' && _resumeFile == null) {
+      print('Resume not provided for job seeker');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please upload your resume'),
+          backgroundColor: Colors.red,
         ),
       );
       return;
     }
 
     setState(() => _isLoading = true);
+    print('Starting signup process');
 
     try {
-      final newUser = User(
-        userId: 'user_${DateTime.now().millisecondsSinceEpoch}',
-        role: _userType!,
-        name: _nameController.text,
-        email: _emailController.text,
-        password: _passwordController.text, // In real app, hash this
-        profile: UserProfile(
-          resumeLink: _resumeFile?.path,
-          profilePicture: _profileImage?.path,
-          companyLogo: _companyLogo?.path,
-          skills: _userType == 'job_seeker' ? _skills : null,
-          experience: _userType == 'job_seeker' ? _experienceController.text : null,
-          education: _userType == 'job_seeker' ? _educationController.text : null,
-          companyWebsite: _userType == 'employer' ? _websiteController.text : null,
-          companyDescription: _userType == 'employer' ? _descriptionController.text : null,
-          savedJobs: [],
-          postedJobs: [],
-          postedInternships: [],
-        ),
-        status: 'active',
+      // 1. Upload files to Cloudinary first
+      print('Starting file uploads');
+      String? profileImageUrl;
+      String? resumeUrl;
+      String? companyLogoUrl;
+
+      if (_userType == 'job_seeker' && _profileImage != null) {
+        print('Uploading profile image');
+        profileImageUrl =
+            await _uploadToCloudinary(_profileImage!, 'profile_pictures');
+        if (profileImageUrl == null) {
+          print('Profile image upload failed');
+          throw Exception('Failed to upload profile image');
+        }
+      }
+
+      if (_userType == 'job_seeker' && _resumeFile != null) {
+        print('Uploading resume');
+        resumeUrl = await _uploadToCloudinary(_resumeFile!, 'resumes');
+        if (resumeUrl == null) {
+          print('Resume upload failed');
+          throw Exception('Failed to upload resume');
+        }
+      }
+
+      if (_userType == 'hr' && _companyLogo != null) {
+        print('Uploading company logo');
+        companyLogoUrl =
+            await _uploadToCloudinary(_companyLogo!, 'company_logos');
+        if (companyLogoUrl == null) {
+          print('Company logo upload failed');
+          throw Exception('Failed to upload company logo');
+        }
+      }
+
+      print('All files uploaded successfully');
+
+      // 2. Check if email already exists
+      print('Checking if email exists');
+      final loginRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc('login')
+          .withConverter<Map<String, dynamic>>(
+            fromFirestore: (snapshot, _) => snapshot.data()!,
+            toFirestore: (data, _) => data,
+          );
+
+      final loginDoc = await loginRef.get();
+
+      if (loginDoc.exists &&
+          loginDoc.data()?.containsKey(_emailController.text) == true) {
+        print('Email already exists');
+        throw Exception('Email already registered');
+      }
+
+      // 3. Create user document in Firestore
+      print('Creating user document');
+      final usersRef = FirebaseFirestore.instance.collection('users');
+      final newUserRef = usersRef.doc();
+
+      // Create properly typed user data
+      final userData = <String, dynamic>{
+        'userId': newUserRef.id,
+        'jobSeeker': _userType == 'job_seeker',
+        'email': _emailController.text,
+        'name': _nameController.text,
+        'password': _passwordController.text, // Note: In production, hash this
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+
+      // Add job seeker specific fields
+      if (_userType == 'job_seeker') {
+        userData.addAll(<String, dynamic>{
+          'Education': _educationController.text,
+          'Experience': _experienceController.text,
+          'Skills': _skills,
+          'profilePicture': profileImageUrl ?? '',
+          'resumeUrl': resumeUrl ?? '',
+        });
+      }
+      // Add HR specific fields
+      else {
+        userData.addAll(<String, dynamic>{
+          'description': _descriptionController.text,
+          'logo': companyLogoUrl ?? '',
+          'website': _websiteController.text,
+        });
+      }
+
+      // 4. Create all documents in a batch to ensure atomicity
+      print('Creating Firestore batch');
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Create user document
+      batch.set(newUserRef, userData);
+
+      // Update login document
+      batch.set(
+        loginRef,
+        <String, dynamic>{_emailController.text: newUserRef.id},
+        SetOptions(merge: true),
       );
 
-      final success = await AuthService.register(newUser);
-      
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Account created successfully!'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.green.shade600,
-          ),
+      // Create empty applied/posts collections
+      if (_userType == 'job_seeker') {
+        batch.set(
+          newUserRef.collection('applied').doc('internship'),
+          <String, dynamic>{},
         );
-
-        Navigator.of(context).pushReplacement(
-          FadeTransitionPageRoute(page: const LoginScreen()),
+        batch.set(
+          newUserRef.collection('applied').doc('job'),
+          <String, dynamic>{},
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Email already exists'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.red.shade600,
-          ),
+        batch.set(
+          newUserRef.collection('posts').doc('internship'),
+          <String, dynamic>{},
+        );
+        batch.set(
+          newUserRef.collection('posts').doc('job'),
+          <String, dynamic>{},
         );
       }
+
+      // Commit the batch
+      print('Committing Firestore batch');
+      await batch.commit();
+      print('Batch committed successfully');
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // Navigate to login screen
+      Navigator.of(context).pushReplacement(
+        FadeTransitionPageRoute(page: const LoginScreen()),
+      );
     } catch (e) {
+      print('Error during signup: $e');
+      print('Error type: ${e.runtimeType}');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.red.shade600,
+          backgroundColor: Colors.red,
         ),
       );
     } finally {
       setState(() => _isLoading = false);
+      print('Signup process completed');
     }
   }
 
@@ -224,7 +457,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
               child: FadeTransition(
                 opacity: _fadeAnimation,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
                   child: SlideTransition(
                     position: _slideAnimation,
                     child: Column(
@@ -293,35 +527,42 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                         label: const Text('Job Seeker'),
                                         selected: _userType == 'job_seeker',
                                         onSelected: (selected) {
-                                          setState(() => _userType = 'job_seeker');
+                                          setState(
+                                              () => _userType = 'job_seeker');
                                         },
-                                        selectedColor: const Color.fromARGB(255, 107, 146, 230),
+                                        selectedColor: const Color.fromARGB(
+                                            255, 107, 146, 230),
                                         labelStyle: TextStyle(
-                                          color: _userType == 'job_seeker' 
-                                              ? Colors.white 
-                                              : const Color.fromARGB(255, 26, 60, 124),
+                                          color: _userType == 'job_seeker'
+                                              ? Colors.white
+                                              : const Color.fromARGB(
+                                                  255, 26, 60, 124),
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 10),
                                     Expanded(
                                       child: ChoiceChip(
-                                        label: const Text('Employer'),
-                                        selected: _userType == 'employer',
+                                        label: const Text('HR (Company)'),
+                                        selected: _userType == 'hr',
                                         onSelected: (selected) {
-                                          setState(() => _userType = 'employer');
+                                          setState(() => _userType = 'hr');
                                         },
-                                        selectedColor: const Color.fromARGB(255, 107, 146, 230),
+                                        selectedColor: const Color.fromARGB(
+                                            255, 107, 146, 230),
                                         labelStyle: TextStyle(
-                                          color: _userType == 'employer' 
-                                              ? Colors.white 
-                                              : const Color.fromARGB(255, 26, 60, 124),
+                                          color: _userType == 'hr'
+                                              ? Colors.white
+                                              : const Color.fromARGB(
+                                                  255, 26, 60, 124),
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(10),
+                                          borderRadius:
+                                              BorderRadius.circular(10),
                                         ),
                                       ),
                                     ),
@@ -333,8 +574,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                 TextFormField(
                                   controller: _nameController,
                                   decoration: InputDecoration(
-                                    labelText: _userType == 'job_seeker' 
-                                        ? 'Full Name' 
+                                    labelText: _userType == 'job_seeker'
+                                        ? 'Full Name'
                                         : 'Company Name',
                                     labelStyle: TextStyle(
                                       color: Colors.grey.shade600,
@@ -348,14 +589,14 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       ),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16, 
+                                      vertical: 16,
                                       horizontal: 20,
                                     ),
                                   ),
                                   validator: (value) {
                                     if (value == null || value.isEmpty) {
-                                      return _userType == 'job_seeker' 
-                                          ? 'Please enter your name' 
+                                      return _userType == 'job_seeker'
+                                          ? 'Please enter your name'
                                           : 'Please enter company name';
                                     }
                                     return null;
@@ -381,7 +622,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       ),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16, 
+                                      vertical: 16,
                                       horizontal: 20,
                                     ),
                                   ),
@@ -415,7 +656,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       ),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16, 
+                                      vertical: 16,
                                       horizontal: 20,
                                     ),
                                     suffixIcon: IconButton(
@@ -462,7 +703,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       ),
                                     ),
                                     contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 16, 
+                                      vertical: 16,
                                       horizontal: 20,
                                     ),
                                     suffixIcon: IconButton(
@@ -474,7 +715,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       ),
                                       onPressed: () {
                                         setState(() {
-                                          _obscureConfirmPassword = !_obscureConfirmPassword;
+                                          _obscureConfirmPassword =
+                                              !_obscureConfirmPassword;
                                         });
                                       },
                                     ),
@@ -490,8 +732,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
 
                                 // Profile Picture/Company Logo
                                 Text(
-                                  _userType == 'job_seeker' 
-                                      ? 'Profile Picture' 
+                                  _userType == 'job_seeker'
+                                      ? 'Profile Picture'
                                       : 'Company Logo',
                                   style: const TextStyle(
                                     color: Color.fromARGB(255, 26, 60, 124),
@@ -507,31 +749,36 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade100,
                                       border: Border.all(
-                                        color: const Color.fromARGB(255, 107, 146, 230),
+                                        color: const Color.fromARGB(
+                                            255, 107, 146, 230),
                                       ),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: _userType == 'job_seeker'
                                         ? _profileImage != null
                                             ? ClipRRect(
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                                 child: Image.file(
                                                   _profileImage!,
                                                   fit: BoxFit.cover,
                                                 ),
                                               )
                                             : const Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
                                                   Icon(
                                                     Icons.add_a_photo,
-                                                    color: Color.fromARGB(255, 107, 146, 230),
+                                                    color: Color.fromARGB(
+                                                        255, 107, 146, 230),
                                                   ),
                                                   SizedBox(height: 5),
                                                   Text(
                                                     'Add Photo',
                                                     style: TextStyle(
-                                                      color: Color.fromARGB(255, 107, 146, 230),
+                                                      color: Color.fromARGB(
+                                                          255, 107, 146, 230),
                                                       fontSize: 12,
                                                     ),
                                                   ),
@@ -539,24 +786,28 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                               )
                                         : _companyLogo != null
                                             ? ClipRRect(
-                                                borderRadius: BorderRadius.circular(12),
+                                                borderRadius:
+                                                    BorderRadius.circular(12),
                                                 child: Image.file(
                                                   _companyLogo!,
                                                   fit: BoxFit.cover,
                                                 ),
                                               )
                                             : const Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
                                                 children: [
                                                   Icon(
                                                     Icons.add_a_photo,
-                                                    color: Color.fromARGB(255, 107, 146, 230),
+                                                    color: Color.fromARGB(
+                                                        255, 107, 146, 230),
                                                   ),
                                                   SizedBox(height: 5),
                                                   Text(
                                                     'Add Logo',
                                                     style: TextStyle(
-                                                      color: Color.fromARGB(255, 107, 146, 230),
+                                                      color: Color.fromARGB(
+                                                          255, 107, 146, 230),
                                                       fontSize: 12,
                                                     ),
                                                   ),
@@ -570,7 +821,7 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                 if (_userType == 'job_seeker') ...[
                                   // Resume Upload
                                   const Text(
-                                    'Resume',
+                                    'Resume (PDF only)',
                                     style: TextStyle(
                                       color: Color.fromARGB(255, 26, 60, 124),
                                       fontWeight: FontWeight.w500,
@@ -580,28 +831,33 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                   OutlinedButton(
                                     onPressed: _pickResume,
                                     style: OutlinedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
                                       shape: RoundedRectangleBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       side: const BorderSide(
-                                        color: Color.fromARGB(255, 107, 146, 230),
+                                        color:
+                                            Color.fromARGB(255, 107, 146, 230),
                                       ),
                                     ),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         const Icon(
                                           Icons.upload,
-                                          color: Color.fromARGB(255, 107, 146, 230),
+                                          color: Color.fromARGB(
+                                              255, 107, 146, 230),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          _resumeFile != null 
-                                              ? 'Resume Selected' 
+                                          _resumeFile != null
+                                              ? 'Resume Selected'
                                               : 'Upload Resume',
                                           style: const TextStyle(
-                                            color: Color.fromARGB(255, 107, 146, 230),
+                                            color: Color.fromARGB(
+                                                255, 107, 146, 230),
                                           ),
                                         ),
                                       ],
@@ -628,13 +884,16 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                             filled: true,
                                             fillColor: Colors.grey.shade50,
                                             border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(12),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
                                               borderSide: const BorderSide(
-                                                color: Color.fromARGB(255, 26, 60, 124),
+                                                color: Color.fromARGB(
+                                                    255, 26, 60, 124),
                                               ),
                                             ),
-                                            contentPadding: const EdgeInsets.symmetric(
-                                              vertical: 16, 
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                              vertical: 16,
                                               horizontal: 20,
                                             ),
                                           ),
@@ -643,11 +902,14 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       const SizedBox(width: 10),
                                       Container(
                                         decoration: BoxDecoration(
-                                          color: const Color.fromARGB(255, 107, 146, 230),
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: const Color.fromARGB(
+                                              255, 107, 146, 230),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
                                         ),
                                         child: IconButton(
-                                          icon: const Icon(Icons.add, color: Colors.white),
+                                          icon: const Icon(Icons.add,
+                                              color: Colors.white),
                                           onPressed: _addSkill,
                                         ),
                                       ),
@@ -656,17 +918,25 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                   const SizedBox(height: 10),
                                   Wrap(
                                     spacing: 8,
-                                    children: _skills.map((skill) => Chip(
-                                      label: Text(skill),
-                                      deleteIcon: const Icon(Icons.close, size: 18),
-                                      onDeleted: () {
-                                        setState(() => _skills.remove(skill));
-                                      },
-                                      backgroundColor: const Color.fromARGB(255, 229, 239, 255),
-                                      labelStyle: const TextStyle(
-                                        color: Color.fromARGB(255, 26, 60, 124),
-                                      ),
-                                    )).toList(),
+                                    children: _skills
+                                        .map((skill) => Chip(
+                                              label: Text(skill),
+                                              deleteIcon: const Icon(
+                                                  Icons.close,
+                                                  size: 18),
+                                              onDeleted: () {
+                                                setState(() =>
+                                                    _skills.remove(skill));
+                                              },
+                                              backgroundColor:
+                                                  const Color.fromARGB(
+                                                      255, 229, 239, 255),
+                                              labelStyle: const TextStyle(
+                                                color: Color.fromARGB(
+                                                    255, 26, 60, 124),
+                                              ),
+                                            ))
+                                        .toList(),
                                   ),
                                   const SizedBox(height: 20),
 
@@ -683,11 +953,13 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: const BorderSide(
-                                          color: Color.fromARGB(255, 26, 60, 124),
+                                          color:
+                                              Color.fromARGB(255, 26, 60, 124),
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        vertical: 16, 
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 16,
                                         horizontal: 20,
                                       ),
                                     ),
@@ -707,11 +979,13 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: const BorderSide(
-                                          color: Color.fromARGB(255, 26, 60, 124),
+                                          color:
+                                              Color.fromARGB(255, 26, 60, 124),
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        vertical: 16, 
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 16,
                                         horizontal: 20,
                                       ),
                                     ),
@@ -719,8 +993,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                   const SizedBox(height: 20),
                                 ],
 
-                                // Employer Specific Fields
-                                if (_userType == 'employer') ...[
+                                // HR Specific Fields
+                                if (_userType == 'hr') ...[
                                   TextFormField(
                                     controller: _websiteController,
                                     decoration: InputDecoration(
@@ -733,11 +1007,13 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: const BorderSide(
-                                          color: Color.fromARGB(255, 26, 60, 124),
+                                          color:
+                                              Color.fromARGB(255, 26, 60, 124),
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        vertical: 16, 
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 16,
                                         horizontal: 20,
                                       ),
                                     ),
@@ -756,11 +1032,13 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                         borderSide: const BorderSide(
-                                          color: Color.fromARGB(255, 26, 60, 124),
+                                          color:
+                                              Color.fromARGB(255, 26, 60, 124),
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        vertical: 16, 
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                        vertical: 16,
                                         horizontal: 20,
                                       ),
                                     ),
@@ -781,8 +1059,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       elevation: 3,
-                                      shadowColor:
-                                          const Color.fromARGB(255, 26, 60, 124),
+                                      shadowColor: const Color.fromARGB(
+                                          255, 26, 60, 124),
                                     ),
                                     child: _isLoading
                                         ? const SizedBox(
@@ -827,7 +1105,8 @@ class _SignupScreenState extends State<SignupScreen> with SingleTickerProviderSt
                                       child: const Text(
                                         "Login",
                                         style: TextStyle(
-                                          color: Color.fromARGB(255, 26, 60, 124),
+                                          color:
+                                              Color.fromARGB(255, 26, 60, 124),
                                           fontWeight: FontWeight.w600,
                                         ),
                                       ),

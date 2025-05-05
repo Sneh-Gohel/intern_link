@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intern_link/screens/application_status_screen.dart';
 import 'package:intern_link/screens/internship_detail_screen.dart';
 import 'package:intern_link/screens/job_detail_screen.dart';
+import 'package:intern_link/screens/profile_screen.dart';
 import 'package:intern_link/screens/saved_items_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -134,33 +135,33 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _applyForListing(Map<String, dynamic> listing) {
-    try{
+    try {
       FirebaseFirestore.instance
-        .collection(listing['type'] == 'internship' ? 'internship' : 'jobs')
-        .doc(listing['id'])
-        .collection('activities')
-        .doc('lists')
-        .update({
-      '${widget.currentUser['userId']}': 'requested',
-    });
+          .collection(listing['type'] == 'internship' ? 'internship' : 'jobs')
+          .doc(listing['id'])
+          .collection('activities')
+          .doc('lists')
+          .update({
+        '${widget.currentUser['userId']}': 'requested',
+      });
 
-    FirebaseFirestore.instance
-        .collection('users')
-        .doc(widget.currentUser['userId'])
-        .collection('applied')
-        .doc(listing['type'])
-        .update({
-      listing['id']: 'requested',
-    });
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.currentUser['userId'])
+          .collection('applied')
+          .doc(listing['type'])
+          .update({
+        listing['id']: 'requested',
+      });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Applied for ${listing['title']}'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.green,
-      ),
-    );
-    } catch(e){
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Applied for ${listing['title']}'),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
       print('Error applying for listing: $e');
     }
   }
@@ -533,7 +534,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _viewDetails(listing,_showInternships),
+                    onPressed: () => _viewDetails(listing, _showInternships),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -685,12 +686,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
             } else if (index == 3) {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => ProfileScreen(user: widget.currentUser),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(
+                    userId: widget.currentUser['userId'], // Pass the user ID
+                  ),
+                ),
+              );
             } else {
               setState(() => _currentIndex = index);
             }
@@ -737,32 +740,31 @@ class _HomeScreenState extends State<HomeScreen> {
     // Implement saved items navigation
   }
 
-  void _viewDetails(Map<String, dynamic> listing,bool internship) {
-    if(internship){
-       Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => InternshipDetailScreen(
-          internship: listing,
-          isSaved: _isSaved(listing['id']),
-          onApply: () => _applyForListing(listing),
-          onSaveToggle: () => _toggleSaved(listing['id']),
-        ),
-      ),
-    );
-    }else{
+  void _viewDetails(Map<String, dynamic> listing, bool internship) {
+    if (internship) {
       Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => JobDetailScreen(
-          job: listing,
-          isSaved: _isSaved(listing['id']),
-          onApply: () => _applyForListing(listing),
-          onSaveToggle: () => _toggleSaved(listing['id']),
+        context,
+        MaterialPageRoute(
+          builder: (context) => InternshipDetailScreen(
+            internship: listing,
+            isSaved: _isSaved(listing['id']),
+            onApply: () => _applyForListing(listing),
+            onSaveToggle: () => _toggleSaved(listing['id']),
+          ),
         ),
-      ),
-    );
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => JobDetailScreen(
+            job: listing,
+            isSaved: _isSaved(listing['id']),
+            onApply: () => _applyForListing(listing),
+            onSaveToggle: () => _toggleSaved(listing['id']),
+          ),
+        ),
+      );
     }
-
   }
 }
