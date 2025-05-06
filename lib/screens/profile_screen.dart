@@ -1,11 +1,11 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String userId; // Now only takes user ID
+  final String userId;
 
   const ProfileScreen({Key? key, required this.userId}) : super(key: key);
 
@@ -14,7 +14,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _activeTab = 0;
   late Future<Map<String, dynamic>> _userData;
   bool _isLoading = true;
   Map<String, dynamic>? _user;
@@ -48,6 +47,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void _viewResume() {
+    if (_user?['resumeUrl'] == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No resume available')),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('My Resume'),
+        content: SizedBox(
+          width: double.maxFinite,
+          height: MediaQuery.of(context).size.height * 0.7,
+          child: Column(
+            children: [
+              Expanded(
+                child: InteractiveViewer(
+                  child: Image.network(
+                    // Try converting PDF URL to JPG automatically
+                    _user!['resumeUrl'].toString().replaceAll('.pdf', '.jpg'),
+                    fit: BoxFit.contain,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Text(
+                          'Failed to load resume preview image.\nPlease open the full resume below.',
+                          textAlign: TextAlign.center,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _launchURL(String url) async {
     if (await canLaunchUrl(Uri.parse(url))) {
       await launchUrl(Uri.parse(url));
@@ -61,24 +119,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFFF5F9FF),
+      return const Scaffold(
+        backgroundColor: Color(0xFFF5F9FF),
         body: Center(
           child: CircularProgressIndicator(
-            color: const Color.fromARGB(255, 107, 146, 230),
+            color: Color(0xFF6B92E6),
           ),
         ),
       );
     }
 
     if (_user == null) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: const Color(0xFFF5F9FF),
         body: Center(
           child: Text(
             'Failed to load profile',
             style: TextStyle(
-              color: const Color.fromARGB(255, 26, 60, 124),
+              color: Color(0xFF1A3C7C),
             ),
           ),
         ),
@@ -86,7 +144,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     final isEmployer = _user!['jobSeeker'] == false;
-    final theme = Theme.of(context);
+    final skillsData = _user!['Skills'];
+
+    final skills = skillsData is List
+        ? skillsData
+            .whereType<String>()
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList()
+        : skillsData is String
+            ? (skillsData as String)
+                .split(',')
+                .map((e) => e.trim())
+                .where((e) => e.isNotEmpty)
+                .toList()
+            : <String>[];
+    print("user skills: ${_user!['Skills']}");
+    print("skills: $skills");
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FF),
@@ -104,8 +178,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      Color.fromARGB(255, 197, 218, 243),
-                      Color.fromARGB(255, 149, 219, 236),
+                      Color(0xFFC5DAF3),
+                      Color(0xFF95DBEC),
                     ],
                   ),
                 ),
@@ -184,85 +258,87 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         side: const BorderSide(
-                          color: Color.fromARGB(255, 107, 146, 230),
+                          color: Color(0xFF6B92E6),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
-                  // Profile Tabs
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color.fromARGB(255, 229, 239, 255),
-                      borderRadius: BorderRadius.circular(12),
+                  // Personal Information Section
+                  _buildSectionTitle('Personal Information'),
+                  const SizedBox(height: 12),
+                  _buildInfoCard(
+                    icon: Iconsax.sms,
+                    title: 'Email',
+                    value: _user!['email'] ?? 'Not provided',
+                  ),
+                  const SizedBox(height: 12),
+                  if (_user!['Experience'] != null) ...[
+                    _buildInfoCard(
+                      icon: Iconsax.briefcase,
+                      title: 'Experience',
+                      value: _user!['Experience'],
                     ),
-                    padding: const EdgeInsets.all(4),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _buildProfileTab('Personal', 0),
-                        ),
-                        Expanded(
-                          child: _buildProfileTab('Professional', 1),
-                        ),
-                      ],
+                    const SizedBox(height: 12),
+                  ],
+                  if (_user!['Education'] != null) ...[
+                    _buildInfoCard(
+                      icon: Iconsax.book,
+                      title: 'Education',
+                      value: _user!['Education'],
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 24),
+                  ],
 
-                  // Tab Content
-                  IndexedStack(
-                    index: _activeTab,
-                    children: [
-                      // Personal Tab
-                      _buildPersonalInfo(),
+                  // Skills Section with Bubbles
+                  if (skills.isNotEmpty) ...[
+                    _buildSectionTitle('My Skills'),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: skills
+                          .map((skill) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE5EFFF),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Text(
+                                  skill,
+                                  style: const TextStyle(
+                                    color: Color(0xFF1A3C7C),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
-                      // Professional Tab
-                      _buildProfessionalInfo(),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
+                  // Resume Section
+                  _buildSectionTitle('My Resume'),
+                  const SizedBox(height: 12),
+                  _buildResumeButton(),
+                  const SizedBox(height: 24),
 
-                  // Additional Actions
-                  _buildActionButton(
-                    icon: Iconsax.document_text,
-                    text: 'My Resume',
-                    onTap: () {
-                      if (_user!['resumeUrl'] != null) {
-                        _launchURL(_user!['resumeUrl']);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('No resume uploaded')),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  _buildActionButton(
-                    icon: Iconsax.shield_tick,
-                    text: 'Privacy Policy',
-                    onTap: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Privacy Policy'),
-                          content: SingleChildScrollView(
-                            child: Text(
-                              _privacyPolicyText,
-                              style: TextStyle(color: Colors.grey.shade700),
-                            ),
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text('Close'),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+                  // Privacy Policy
+                  _buildSectionTitle('Settings'),
+                  const SizedBox(height: 12),
+                  _buildPrivacyPolicyButton(),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),
@@ -272,100 +348,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Privacy Policy Text
-  final String _privacyPolicyText = '''
-1. Information We Collect:
-We collect personal information you provide when creating an account, including name, email, education, skills, and work experience.
-
-2. How We Use Your Information:
-- To provide and improve our services
-- To connect job seekers with employers
-- To communicate with you about opportunities
-- For analytics and service improvements
-
-3. Data Sharing:
-We only share your profile information with potential employers when you apply for positions. We do not sell your data to third parties.
-
-4. Data Security:
-We implement industry-standard security measures to protect your information.
-
-5. Your Rights:
-You can access, update, or delete your personal information through your account settings.
-
-6. Changes to This Policy:
-We may update this policy and will notify you of significant changes.
-
-7. Contact Us:
-For any privacy-related questions, please contact support@internlink.com
-''';
-
-  Widget _buildProfileTab(String title, int index) {
-    return GestureDetector(
-      onTap: () => setState(() => _activeTab = index),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: _activeTab == index
-              ? const Color.fromARGB(255, 107, 146, 230)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          title,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: _activeTab == index
-                ? Colors.white
-                : const Color.fromARGB(255, 26, 60, 124),
-            fontWeight: FontWeight.w500,
-          ),
+  Widget _buildSectionTitle(String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF1A3C7C),
         ),
       ),
-    );
-  }
-
-  Widget _buildPersonalInfo() {
-    return Column(
-      children: [
-        _buildInfoCard(
-          icon: Iconsax.sms,
-          title: 'Email',
-          value: _user!['email'] ?? 'Not provided',
-        ),
-        const SizedBox(height: 12),
-        if (_user!['Experience'] != null)
-          _buildInfoCard(
-            icon: Iconsax.briefcase,
-            title: 'Experience',
-            value: _user!['Experience'],
-          ),
-        if (_user!['Experience'] != null) const SizedBox(height: 12),
-        if (_user!['Education'] != null)
-          _buildInfoCard(
-            icon: Iconsax.book,
-            title: 'Education',
-            value: _user!['Education'],
-          ),
-      ],
-    );
-  }
-
-  Widget _buildProfessionalInfo() {
-    return Column(
-      children: [
-        if (_user!['Skills'] != null && _user!['Skills'].isNotEmpty)
-          _buildSkillsCard(),
-        if (_user!['resumeUrl'] != null) ...[
-          const SizedBox(height: 12),
-          _buildInfoCard(
-            icon: Iconsax.document,
-            title: 'Resume',
-            value: 'View my resume',
-            isLink: true,
-            onTap: () => _launchURL(_user!['resumeUrl']),
-          ),
-        ],
-      ],
     );
   }
 
@@ -373,67 +366,7 @@ For any privacy-related questions, please contact support@internlink.com
     required IconData icon,
     required String title,
     required String value,
-    bool isLink = false,
-    VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: const Color.fromARGB(255, 107, 146, 230),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: Color.fromARGB(255, 26, 60, 124),
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      color: isLink
-                          ? const Color.fromARGB(255, 107, 146, 230)
-                          : Colors.grey.shade700,
-                      decoration: isLink ? TextDecoration.underline : null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSkillsCard() {
-    final skills = _user!['Skills']?.split(', ') ?? [];
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -448,52 +381,44 @@ For any privacy-related questions, please contact support@internlink.com
           ),
         ],
       ),
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(
-                Iconsax.cpu,
-                size: 20,
-                color: Color.fromARGB(255, 107, 146, 230),
-              ),
-              SizedBox(width: 12),
-              Text(
-                'Skills',
-                style: TextStyle(
-                  color: Color.fromARGB(255, 26, 60, 124),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          Icon(
+            icon,
+            size: 20,
+            color: const Color(0xFF6B92E6),
           ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: skills
-                .map((skill) => Chip(
-                      label: Text(skill.trim()),
-                      backgroundColor: const Color.fromARGB(255, 229, 239, 255),
-                      labelStyle: const TextStyle(
-                        color: Color.fromARGB(255, 26, 60, 124),
-                      ),
-                    ))
-                .toList(),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: Color(0xFF1A3C7C),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton({
-    required IconData icon,
-    required String text,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildResumeButton() {
     return GestureDetector(
-      onTap: onTap,
+      onTap: _viewResume,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -509,26 +434,124 @@ For any privacy-related questions, please contact support@internlink.com
         ),
         child: Row(
           children: [
-            Icon(
-              icon,
-              color: const Color.fromARGB(255, 107, 146, 230),
+            const Icon(
+              Iconsax.document_text,
+              color: Color(0xFF6B92E6),
+              size: 24,
             ),
             const SizedBox(width: 12),
-            Text(
-              text,
-              style: const TextStyle(
-                color: Color.fromARGB(255, 26, 60, 124),
+            const Expanded(
+              child: Text(
+                'View My Resume',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1A3C7C),
+                ),
               ),
             ),
-            const Spacer(),
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Color.fromARGB(255, 107, 146, 230),
+            Icon(
+              Iconsax.arrow_right_3,
+              color: const Color(0xFF6B92E6),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildPrivacyPolicyButton() {
+    return GestureDetector(
+      onTap: () {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Privacy Policy'),
+            content: SingleChildScrollView(
+              child: Text(
+                _privacyPolicyText,
+                style: TextStyle(color: Colors.grey.shade700),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Iconsax.shield_tick,
+              color: Color(0xFF6B92E6),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Privacy Policy',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF1A3C7C),
+                ),
+              ),
+            ),
+            Icon(
+              Iconsax.arrow_right_3,
+              color: const Color(0xFF6B92E6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  final String _privacyPolicyText = '''
+1. Information Collection:
+We collect personal information including your name, email, education, skills, and work experience when you create an account.
+
+2. Use of Information:
+Your information is used to:
+- Create and manage your profile
+- Connect you with potential employers
+- Improve our services
+- Communicate important updates
+
+3. Data Sharing:
+Your profile information is only shared with employers when you apply for positions. We never sell your data to third parties.
+
+4. Data Security:
+We implement industry-standard security measures including encryption and secure servers to protect your information.
+
+5. Your Rights:
+You can:
+- Access and review your data
+- Update or correct information
+- Delete your account
+- Request a copy of your data
+
+6. Changes to Policy:
+We will notify you of any significant changes to this policy via email or in-app notification.
+
+7. Contact Us:
+For any questions about your data or this policy, please contact:
+privacy@internlink.com
+''';
 }
