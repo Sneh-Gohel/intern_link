@@ -166,9 +166,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDetailItem(Iconsax.money, 'Salary', job['salary'] ?? 'Not specified'),
-                          _buildDetailItem(Iconsax.location, 'Location', job['location'] ?? 'Remote'),
-                          _buildDetailItem(Iconsax.calendar, 'Last Date', 'Apply by ${job['lastDate'] ?? 'Not specified'}'),
+                          _buildDetailItem(Iconsax.money, 'Salary',
+                              job['salary'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.location, 'Location',
+                              job['location'] ?? 'Remote'),
+                          _buildDetailItem(Iconsax.calendar, 'Last Date',
+                              'Apply by ${job['lastDate'] ?? 'Not specified'}'),
                           const SizedBox(height: 20),
                           Text(
                             'Job Description',
@@ -191,9 +194,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDetailItem(Iconsax.book, 'Education', job['education'] ?? 'Not specified'),
-                          _buildDetailItem(Iconsax.cpu, 'Skills Required', job['skillsRequired'] ?? 'Not specified'),
-                          _buildDetailItem(Iconsax.briefcase, 'Experience', job['experience'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.book, 'Education',
+                              job['education'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.cpu, 'Skills Required',
+                              job['skillsRequired'] ?? 'Not specified'),
+                          _buildDetailItem(Iconsax.briefcase, 'Experience',
+                              job['experience'] ?? 'Not specified'),
                           const SizedBox(height: 20),
                           Text(
                             'Additional Requirements',
@@ -204,7 +210,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            (job['AR'] as List?)?.map((item) => '• $item').join('\n') ?? 'No additional requirements',
+                            (job['AR'] as List?)
+                                    ?.map((item) => '• $item')
+                                    .join('\n') ??
+                                'No additional requirements',
                             style: TextStyle(
                               color: Colors.grey.shade700,
                               height: 1.5,
@@ -216,8 +225,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          ...(job['benefits'] as List?)?.map((benefit) => _buildBulletPoint(benefit)) ?? 
-                              [_buildBulletPoint('No benefits information available')],
+                          ...(job['benefits'] as List?)?.map(
+                                  (benefit) => _buildBulletPoint(benefit)) ??
+                              [
+                                _buildBulletPoint(
+                                    'No benefits information available')
+                              ],
                           const SizedBox(height: 20),
                           Text(
                             'Company Culture',
@@ -228,7 +241,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            job['companyDescription'] ?? 'No company culture information available',
+                            job['description'] ??
+                                'No company culture information available',
                             style: TextStyle(
                               color: Colors.grey.shade700,
                               height: 1.5,
@@ -289,7 +303,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   setState(() => _isApplying = false);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: const Text('Application submitted successfully!'),
+                      content:
+                          const Text('Application submitted successfully!'),
                       behavior: SnackBarBehavior.floating,
                       backgroundColor: Colors.green,
                     ),
@@ -338,7 +353,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
           title,
           textAlign: TextAlign.center,
           style: TextStyle(
-            color: _currentTab == index ? Colors.white : const Color.fromARGB(255, 26, 60, 124),
+            color: _currentTab == index
+                ? Colors.white
+                : const Color.fromARGB(255, 26, 60, 124),
             fontWeight: FontWeight.w500,
           ),
         ),

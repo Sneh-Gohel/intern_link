@@ -5,26 +5,26 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intern_link/screens/LoginScreen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class ProfileScreen extends StatefulWidget {
+class HRProfileScreen extends StatefulWidget {
   final String userId;
-  final bool isHR;
-
-  const ProfileScreen({Key? key, required this.userId, required this.isHR})
-      : super(key: key);
+  const HRProfileScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<HRProfileScreen> createState() => _HRProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _HRProfileScreenState extends State<HRProfileScreen> {
   late Future<Map<String, dynamic>> _userData;
   bool _isLoading = true;
   Map<String, dynamic>? _user;
+  int _postedInternshipsCount = 0;
+  int _postedJobsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _userData = _fetchUserData();
+    _fetchPostedCounts();
   }
 
   Future<Map<String, dynamic>> _fetchUserData() async {
@@ -50,63 +50,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _viewResume() {
-    if (_user?['resumeUrl'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No resume available')),
-      );
-      return;
-    }
+  Future<void> _fetchPostedCounts() async {
+    try {
+      final internships = await FirebaseFirestore.instance
+          .collection('internship')
+          .where('postedBy', isEqualTo: widget.userId)
+          .get();
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('My Resume'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: MediaQuery.of(context).size.height * 0.7,
-          child: Column(
-            children: [
-              Expanded(
-                child: InteractiveViewer(
-                  child: Image.network(
-                    // Try converting PDF URL to JPG automatically
-                    _user!['resumeUrl'].toString().replaceAll('.pdf', '.jpg'),
-                    fit: BoxFit.contain,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Center(
-                        child: Text(
-                          'Failed to load resume preview image.\nPlease open the full resume below.',
-                          textAlign: TextAlign.center,
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
+      final jobs = await FirebaseFirestore.instance
+          .collection('jobs')
+          .where('postedBy', isEqualTo: widget.userId)
+          .get();
+
+      setState(() {
+        _postedInternshipsCount = internships.size;
+        _postedJobsCount = jobs.size;
+      });
+    } catch (e) {
+      print('Error fetching posted counts: $e');
+    }
   }
 
   Future<void> _launchURL(String url) async {
@@ -134,7 +96,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (_user == null) {
       return const Scaffold(
-        backgroundColor: const Color(0xFFF5F9FF),
+        backgroundColor: Color(0xFFF5F9FF),
         body: Center(
           child: Text(
             'Failed to load profile',
@@ -145,25 +107,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
-
-    final isEmployer = _user!['jobSeeker'] == false;
-    final skillsData = _user!['Skills'];
-
-    final skills = skillsData is List
-        ? skillsData
-            .whereType<String>()
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList()
-        : skillsData is String
-            ? (skillsData as String)
-                .split(',')
-                .map((e) => e.trim())
-                .where((e) => e.isNotEmpty)
-                .toList()
-            : <String>[];
-    print("user skills: ${_user!['Skills']}");
-    print("skills: $skills");
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FF),
@@ -194,17 +137,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       backgroundColor: Colors.white,
                       child: CircleAvatar(
                         radius: 46,
-                        backgroundImage: _user!['profilePicture'] != null
-                            ? CachedNetworkImageProvider(
-                                _user!['profilePicture'])
+                        backgroundImage: _user!['logo'] != null
+                            ? CachedNetworkImageProvider(_user!['logo'])
                             : const AssetImage(
-                                    'assets/images/default_profile.png')
+                                    'assets/images/default_company.png')
                                 as ImageProvider,
                       ),
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      _user!['name'] ?? 'No Name',
+                      _user!['name'] ?? 'Company Name',
                       style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -212,7 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     Text(
-                      isEmployer ? 'Employer' : 'Job Seeker',
+                      'HR Representative',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.9),
                       ),
@@ -223,28 +165,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             actions: [
-              widget.isHR
-                  ? const Center()
-                  : IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Iconsax.logout,
-                          color: Colors.white,
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(
-                              builder: (context) => const LoginScreen()),
-                          (Route<dynamic> route) => false,
-                        );
-                      },
-                    ),
+              IconButton(
+                icon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Iconsax.logout,
+                    color: Colors.white,
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                        builder: (context) => const LoginScreen()),
+                    (Route<dynamic> route) => false,
+                  );
+                },
+              ),
             ],
           ),
           SliverToBoxAdapter(
@@ -260,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         print("Edit Profile Button Pressed");
                       },
                       icon: const Icon(Iconsax.edit, size: 18),
-                      label: const Text('Edit Profile'),
+                      label: const Text('Edit Company Profile'),
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
@@ -274,8 +214,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Personal Information Section
-                  _buildSectionTitle('Personal Information'),
+                  // Company Stats
+                  _buildSectionTitle('Company Stats'),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          value: _postedInternshipsCount.toString(),
+                          label: 'Posted Internships',
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          value: _postedJobsCount.toString(),
+                          label: 'Posted Jobs',
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Company Information Section
+                  _buildSectionTitle('Company Information'),
                   const SizedBox(height: 12),
                   _buildInfoCard(
                     icon: Iconsax.sms,
@@ -283,67 +245,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     value: _user!['email'] ?? 'Not provided',
                   ),
                   const SizedBox(height: 12),
-                  if (_user!['Experience'] != null) ...[
+                  if (_user!['description'] != null) ...[
                     _buildInfoCard(
-                      icon: Iconsax.briefcase,
-                      title: 'Experience',
-                      value: _user!['Experience'],
+                      icon: Iconsax.note_text,
+                      title: 'Description',
+                      value: _user!['description'],
                     ),
                     const SizedBox(height: 12),
                   ],
-                  if (_user!['Education'] != null) ...[
-                    _buildInfoCard(
-                      icon: Iconsax.book,
-                      title: 'Education',
-                      value: _user!['Education'],
+                  if (_user!['website'] != null) ...[
+                    GestureDetector(
+                      onTap: () => _launchURL(_user!['website']),
+                      child: _buildInfoCard(
+                        icon: Iconsax.global,
+                        title: 'Website',
+                        value: _user!['website'],
+                      ),
                     ),
                     const SizedBox(height: 24),
                   ],
 
-                  // Skills Section with Bubbles
-                  if (skills.isNotEmpty) ...[
-                    _buildSectionTitle('My Skills'),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: skills
-                          .map((skill) => Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE5EFFF),
-                                  borderRadius: BorderRadius.circular(20),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.05),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  skill,
-                                  style: const TextStyle(
-                                    color: Color(0xFF1A3C7C),
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ))
-                          .toList(),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Resume Section
-                  _buildSectionTitle('My Resume'),
+                  // Contact Information
+                  _buildSectionTitle('Contact Information'),
                   const SizedBox(height: 12),
-                  _buildResumeButton(),
+                  _buildContactButton(
+                    icon: Iconsax.global,
+                    label: 'Visit Website',
+                    onTap: () => _launchURL(_user!['website'] ?? ''),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildContactButton(
+                    icon: Iconsax.sms,
+                    label: 'Contact Support',
+                    onTap: () {
+                      // Handle contact support
+                    },
+                  ),
                   const SizedBox(height: 24),
 
-                  // Privacy Policy
+                  // Settings
                   _buildSectionTitle('Settings'),
                   const SizedBox(height: 12),
                   _buildPrivacyPolicyButton(),
@@ -367,6 +307,42 @@ class _ProfileScreenState extends State<ProfileScreen> {
           fontWeight: FontWeight.bold,
           color: Color(0xFF1A3C7C),
         ),
+      ),
+    );
+  }
+
+  Widget _buildStatCard({required String value, required String label}) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1A3C7C),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -425,9 +401,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildResumeButton() {
+  Widget _buildContactButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
-      onTap: _viewResume,
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -443,25 +423,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         child: Row(
           children: [
-            const Icon(
-              Iconsax.document_text,
-              color: Color(0xFF6B92E6),
+            Icon(
+              icon,
+              color: const Color(0xFF6B92E6),
               size: 24,
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Text(
-                'View My Resume',
-                style: TextStyle(
+                label,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF1A3C7C),
                 ),
               ),
             ),
-            Icon(
+            const Icon(
               Iconsax.arrow_right_3,
-              color: const Color(0xFF6B92E6),
+              color: Color(0xFF6B92E6),
             ),
           ],
         ),
@@ -522,9 +502,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
             ),
-            Icon(
+            const Icon(
               Iconsax.arrow_right_3,
-              color: const Color(0xFF6B92E6),
+              color: Color(0xFF6B92E6),
             ),
           ],
         ),
@@ -534,17 +514,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   final String _privacyPolicyText = '''
 1. Information Collection:
-We collect personal information including your name, email, education, skills, and work experience when you create an account.
+We collect company information including name, logo, description, and contact details when you create an HR account.
 
 2. Use of Information:
 Your information is used to:
-- Create and manage your profile
-- Connect you with potential employers
-- Improve our services
+- Create and manage your company profile
+- Display your job postings
+- Verify your organization
 - Communicate important updates
 
 3. Data Sharing:
-Your profile information is only shared with employers when you apply for positions. We never sell your data to third parties.
+Your company information is visible to job seekers who view your postings. We never sell your data to third parties.
 
 4. Data Security:
 We implement industry-standard security measures including encryption and secure servers to protect your information.

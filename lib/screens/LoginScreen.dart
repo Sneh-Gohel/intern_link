@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:intern_link/screens/HRHomeScreen.dart';
 import 'package:intern_link/screens/HomeScreen.dart';
 import 'package:intern_link/screens/SignupScreen.dart';
 import 'package:intern_link/services/FadeTransitionPageRoute.dart';
@@ -89,9 +90,16 @@ class _LoginScreenState extends State<LoginScreen>
     final userData = querySnapshot.docs.first.data();
 
     if (userData['password'] == _passwordController.text) {
-      Navigator.of(context).pushReplacement(
+      if(userData['jobSeeker'] == true) {
+        Navigator.of(context).pushReplacement(
         FadeTransitionPageRoute(page: HomeScreen(currentUser: userData)),
       );
+      }
+      else{
+        Navigator.of(context).pushReplacement(
+        FadeTransitionPageRoute(page: HRHomeScreen(email: _emailController.text.trim(),)),
+      );
+      }
     } else {
       setState(() {
         _errorMessage = 'Invalid email or password.';

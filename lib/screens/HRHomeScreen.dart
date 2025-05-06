@@ -2,21 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:intern_link/screens/application_status_screen.dart';
-import 'package:intern_link/screens/internship_detail_screen.dart';
-import 'package:intern_link/screens/job_detail_screen.dart';
+import 'package:intern_link/screens/AddInternshipScreen.dart';
+import 'package:intern_link/screens/AddJobScreen.dart';
+import 'package:intern_link/screens/HRInternshipDetailsScreen.dart';
+import 'package:intern_link/screens/HRJobDetailsScreen.dart';
+import 'package:intern_link/screens/HRProfileScreen.dart';
 import 'package:intern_link/screens/profile_screen.dart';
-import 'package:intern_link/screens/saved_items_screen.dart';
 
-class HomeScreen extends StatefulWidget {
-  final Map<String, dynamic> currentUser;
-  const HomeScreen({super.key, required this.currentUser});
+class HRHomeScreen extends StatefulWidget {
+  final String email;
+  const HRHomeScreen({super.key, required this.email});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HRHomeScreen> createState() => _HRHomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HRHomeScreenState extends State<HRHomeScreen> {
   int _currentIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, dynamic>> _internships = [];
@@ -25,104 +26,14 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Map<String, dynamic>> _filteredJobs = [];
   bool _isLoading = true;
   bool _showInternships = true;
-  String _selectedCategory = '';
-
-  // Category keywords map
-  final Map<String, List<String>> _categoryKeywords = {
-    'Development': [
-      'flutter',
-      'software',
-      'developer',
-      'development',
-      'programming',
-      'coding',
-      'frontend',
-      'backend',
-      'fullstack',
-      'mobile',
-      'web',
-      'android',
-      'ios',
-      'react',
-      'javascript',
-      'python',
-      'java',
-      'c++',
-      'dart',
-      'node'
-    ],
-    'Design': [
-      'design',
-      'ui',
-      'ux',
-      'graphic',
-      'figma',
-      'adobe',
-      'photoshop',
-      'illustrator',
-      'sketch',
-      'prototype',
-      'wireframe',
-      'user experience',
-      'user interface',
-      'visual',
-      'creative',
-      'art',
-      'branding',
-      'typography',
-      'layout',
-      'interaction'
-    ],
-    'Marketing': [
-      'marketing',
-      'digital',
-      'social media',
-      'seo',
-      'content',
-      'brand',
-      'advertising',
-      'campaign',
-      'strategy',
-      'analytics',
-      'growth',
-      'sales',
-      'public relations',
-      'influencer',
-      'email',
-      'market research',
-      'customer',
-      'engagement',
-      'promotion',
-      'outreach'
-    ],
-    'Data Science': [
-      'data',
-      'science',
-      'machine learning',
-      'ai',
-      'artificial intelligence',
-      'python',
-      'r',
-      'sql',
-      'analysis',
-      'analytics',
-      'statistics',
-      'visualization',
-      'big data',
-      'deep learning',
-      'neural networks',
-      'tensorflow',
-      'pytorch',
-      'numpy',
-      'pandas',
-      'scikit'
-    ],
-  };
+  String _userId = '';
+  String _companyName = '';
+  String _companyLogo = '';
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadUserData();
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -139,92 +50,88 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _filterListings() {
     final searchTerm = _searchController.text.toLowerCase();
-    
+
     setState(() {
       _filteredInternships = _internships.where((internship) {
-        final titleMatches = internship['title'].toLowerCase().contains(searchTerm);
-        final companyMatches = internship['companyName'].toLowerCase().contains(searchTerm);
-        
-        if (_selectedCategory.isEmpty) {
-          return titleMatches || companyMatches;
-        } else {
-          final categoryKeywords = _categoryKeywords[_selectedCategory] ?? [];
-          final matchesCategory = categoryKeywords.any((keyword) => 
-              internship['title'].toLowerCase().contains(keyword));
-          return (titleMatches || companyMatches) && matchesCategory;
-        }
+        final titleMatches =
+            internship['title'].toLowerCase().contains(searchTerm);
+        return titleMatches;
       }).toList();
 
       _filteredJobs = _jobs.where((job) {
         final titleMatches = job['title'].toLowerCase().contains(searchTerm);
-        final companyMatches = job['companyName'].toLowerCase().contains(searchTerm);
-        
-        if (_selectedCategory.isEmpty) {
-          return titleMatches || companyMatches;
-        } else {
-          final categoryKeywords = _categoryKeywords[_selectedCategory] ?? [];
-          final matchesCategory = categoryKeywords.any((keyword) => 
-              job['title'].toLowerCase().contains(keyword));
-          return (titleMatches || companyMatches) && matchesCategory;
-        }
+        return titleMatches;
       }).toList();
     });
   }
 
-  void _selectCategory(String category) {
-    setState(() {
-      _selectedCategory = _selectedCategory == category ? '' : category;
-      _filterListings();
-    });
-  }
-
-  Future<void> _loadData() async {
+  Future<void> _loadUserData() async {
     try {
-      print("fetching internships...");
-      final internshipsSnapshot = await FirebaseFirestore.instance
-          .collection('internship')
-          .where('status', isEqualTo: 'open')
+      // Get user data based on email
+      final userQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: widget.email)
+          .limit(1)
           .get();
 
-      _internships =
-          await Future.wait(internshipsSnapshot.docs.map((doc) async {
-        final data = doc.data();
-        print('Internship data: $data');
+      if (userQuery.docs.isNotEmpty) {
+        final userData = userQuery.docs.first.data();
+        setState(() {
+          _userId = userData['userId'];
+          _companyName = userData['name'];
+          _companyLogo = userData['logo'];
+        });
 
-        final company = await _getCompanyData(data['postedBy']);
+        // Load the HR's posted internships and jobs
+        await _loadPostedListings();
+      }
+    } catch (e) {
+      print('Error loading user data: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _loadPostedListings() async {
+    try {
+      // Load posted internships
+      final internshipsSnapshot = await FirebaseFirestore.instance
+          .collection('internship')
+          .where('postedBy', isEqualTo: _userId)
+          .get();
+
+      _internships = internshipsSnapshot.docs.map((doc) {
+        final data = doc.data();
         return {
           'id': doc.id,
           'type': 'internship',
           'title': data['title'],
-          'companyLogo': company['logo'],
-          'companyName': company['name'],
-          'location': data['location'], 
+          'companyLogo': _companyLogo,
+          'companyName': _companyName,
+          'location': data['location'],
           'stipend': data['stipen'],
           'duration': data['duration'],
           'applyBy': data['applyBy'],
           'about': data['about'],
           'eligibility': data['eligibility criteria'],
           'postedBy': data['postedBy'],
+          'status': data['status'],
         };
-      }));
+      }).toList();
 
-      // Load jobs
+      // Load posted jobs
       final jobsSnapshot = await FirebaseFirestore.instance
           .collection('jobs')
-          .where('status', isEqualTo: 'open')
+          .where('postedBy', isEqualTo: _userId)
           .get();
 
-      _jobs = await Future.wait(jobsSnapshot.docs.map((doc) async {
+      _jobs = jobsSnapshot.docs.map((doc) {
         final data = doc.data();
-        print('Job data: $data');
-
-        final company = await _getCompanyData(data['postedBy']);
         return {
           'id': doc.id,
           'type': 'job',
           'title': data['title'],
-          'companyLogo': company['logo'],
-          'companyName': company['name'],
+          'companyLogo': _companyLogo,
+          'companyName': _companyName,
           'location': data['location'],
           'salary': data['salary'],
           'lastDate': data['lastDate'],
@@ -235,108 +142,148 @@ class _HomeScreenState extends State<HomeScreen> {
           'benefits': data['benefits'],
           'AR': data['AR'],
           'postedBy': data['postedBy'],
+          'status': data['status'],
         };
-      }));
+      }).toList();
 
       setState(() {
         _isLoading = false;
         _filteredInternships = _internships;
         _filteredJobs = _jobs;
       });
-
-      print(_internships);
-      print(_jobs);
     } catch (e) {
-      print('Error loading data: $e');
+      print('Error loading posted listings: $e');
       setState(() => _isLoading = false);
     }
   }
 
-  Future<Map<String, dynamic>> _getCompanyData(String userId) async {
+  Future<void> _closeListing(Map<String, dynamic> listing) async {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
-      return doc.data() ?? {};
-    } catch (e) {
-      print('Error loading company data: $e');
-      return {};
-    }
-  }
-
-  void _toggleSaved(String listingId) {
-    setState(() {
-      final saved = List<String>.from(widget.currentUser['saved'] ?? []);
-      if (saved.contains(listingId)) {
-        saved.remove(listingId);
-      } else {
-        saved.add(listingId);
-      }
-
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUser['userId'])
-          .update({'saved': saved});
-
-      widget.currentUser['saved'] = saved;
-    });
-  }
-
-  void _applyForListing(Map<String, dynamic> listing) {
-    try {
-      FirebaseFirestore.instance
+      await FirebaseFirestore.instance
           .collection(listing['type'] == 'internship' ? 'internship' : 'jobs')
           .doc(listing['id'])
-          .collection('activities')
-          .doc('lists')
-          .update({
-        '${widget.currentUser['userId']}': 'requested',
-      });
-
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(widget.currentUser['userId'])
-          .collection('applied')
-          .doc(listing['type'])
-          .update({
-        listing['id']: 'requested',
-      });
+          .update({'status': 'closed'});
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Applied for ${listing['title']}'),
+          content: Text('${listing['title']} has been closed'),
           behavior: SnackBarBehavior.floating,
           backgroundColor: Colors.green,
         ),
       );
+
+      // Reload data to reflect changes
+      await _loadPostedListings();
     } catch (e) {
-      print('Error applying for listing: $e');
+      print('Error closing listing: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to close listing'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+
+  void _addNewListing() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Add New Listing',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddInternshipScreen(
+                      userId: _userId,
+                      companyName: _companyName,
+                      companyLogo: _companyLogo,
+                      email: widget.email,
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 107, 146, 230),
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Add Internship',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 10),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddJobScreen(
+                      userId: _userId,
+                      companyName: _companyName,
+                      companyLogo: _companyLogo,
+                      email: widget.email,
+                    ),
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 107, 146, 230),
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                'Add Job',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   List<Map<String, dynamic>> get _displayedListings {
     return _showInternships ? _filteredInternships : _filteredJobs;
   }
 
-  List<Map<String, dynamic>> get _savedListings {
-    final savedIds = List<String>.from(widget.currentUser['saved'] ?? []);
-    return [..._internships, ..._jobs]
-        .where((item) => savedIds.contains(item['id']))
-        .toList();
-  }
-
-  bool _isSaved(String listingId) {
-    return (widget.currentUser['saved'] as List?)?.contains(listingId) ?? false;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F9FF),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addNewListing,
+        backgroundColor: const Color.fromARGB(255, 107, 146, 230),
+        child: const Icon(Iconsax.add, color: Colors.white),
+      ),
       body: CustomScrollView(
         slivers: [
-          // App bar with search - UPDATED TO MATCH ORIGINAL UI
+          // App bar with search - Matching the original UI
           SliverAppBar(
             backgroundColor: const Color(0xFFF5F9FF),
             elevation: 0,
@@ -364,15 +311,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Hello,',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.white.withOpacity(0.8),
+                                color: Colors.white,
                               ),
                             ),
                             Text(
-                              widget.currentUser['name'].split(' ').first,
+                              _companyName,
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -388,13 +335,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             backgroundColor: Colors.white,
                             child: CircleAvatar(
                               radius: 20,
-                              backgroundImage: widget
-                                          .currentUser['profilePicture'] !=
-                                      null
-                                  ? CachedNetworkImageProvider(
-                                      widget.currentUser['profilePicture'])
+                              backgroundImage: _companyLogo.isNotEmpty
+                                  ? CachedNetworkImageProvider(_companyLogo)
                                   : const AssetImage(
-                                          'assets/images/default_profile.png')
+                                          'assets/images/default_company.png')
                                       as ImageProvider,
                             ),
                           ),
@@ -415,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
-                    hintText: 'Search internships, jobs...',
+                    hintText: 'Search your postings...',
                     hintStyle: TextStyle(color: Colors.grey.shade400),
                     prefixIcon: Icon(Iconsax.search_normal,
                         color: Colors.grey.shade600),
@@ -430,62 +374,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Content - UPDATED TO MATCH ORIGINAL UI
+          // Content
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Categories
-                  const Text(
-                    'Categories',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color.fromARGB(255, 26, 60, 124),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  SizedBox(
-                    height: 100,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildCategoryCard(
-                          Iconsax.code,
-                          'Development',
-                          const Color(0xFFE1F0FF),
-                          const Color(0xFF1A3C7C),
-                          isSelected: _selectedCategory == 'Development',
-                        ),
-                        _buildCategoryCard(
-                          Iconsax.designtools,
-                          'Design',
-                          const Color(0xFFFFE7F5),
-                          const Color(0xFFD23369),
-                          isSelected: _selectedCategory == 'Design',
-                        ),
-                        _buildCategoryCard(
-                          Iconsax.chart_2,
-                          'Marketing',
-                          const Color(0xFFE4F9E4),
-                          const Color(0xFF2E7D32),
-                          isSelected: _selectedCategory == 'Marketing',
-                        ),
-                        _buildCategoryCard(
-                          Iconsax.cpu,
-                          'Data Science',
-                          const Color(0xFFF0E7FF),
-                          const Color(0xFF5E35B1),
-                          isSelected: _selectedCategory == 'Data Science',
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
                   // Toggle between Internships and Jobs
                   Row(
                     children: [
@@ -529,27 +424,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const SizedBox(height: 25),
 
-                  // Featured Listings
+                  // Posted Listings Header
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         _showInternships
-                            ? 'Featured Internships'
-                            : 'Featured Jobs',
+                            ? 'Your Posted Internships'
+                            : 'Your Posted Jobs',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Color.fromARGB(255, 26, 60, 124),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => _navigateToSaved(),
-                        child: const Text(
-                          'See all',
-                          style: TextStyle(
-                            color: Color.fromARGB(255, 107, 146, 230),
-                          ),
                         ),
                       ),
                     ],
@@ -559,7 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // Listings - UPDATED TO MATCH ORIGINAL UI
+          // Listings
           _isLoading
               ? SliverToBoxAdapter(
                   child: Center(
@@ -577,7 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         padding: const EdgeInsets.all(20.0),
                         child: Center(
                           child: Text(
-                            'No ${_showInternships ? 'internships' : 'jobs'} available',
+                            'No ${_showInternships ? 'internships' : 'jobs'} posted yet',
                             style: TextStyle(
                               color: Colors.grey.shade600,
                               fontSize: 16,
@@ -600,8 +486,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildListingCard(Map<String, dynamic> listing) {
-    final isSaved = _isSaved(listing['id']);
     final isInternship = listing['type'] == 'internship';
+    final isClosed = listing['status'] == 'closed';
 
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 0, 20, 15),
@@ -639,14 +525,23 @@ class _HomeScreenState extends State<HomeScreen> {
               listing['companyName'],
               style: TextStyle(color: Colors.grey.shade600),
             ),
-            trailing: IconButton(
-              icon: Icon(
-                isSaved ? Iconsax.bookmark_25 : Iconsax.bookmark,
-                color: isSaved
-                    ? const Color.fromARGB(255, 107, 146, 230)
-                    : Colors.grey.shade400,
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: isClosed
+                    ? const Color(0xFFFFEBEE)
+                    : const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(12),
               ),
-              onPressed: () => _toggleSaved(listing['id']),
+              child: Text(
+                isClosed ? 'Closed' : 'Open',
+                style: TextStyle(
+                  color: isClosed
+                      ? const Color(0xFFC62828)
+                      : const Color(0xFF2E7D32),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
           Padding(
@@ -673,7 +568,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 10),
                     _buildDetailChip(
                       Iconsax.calendar,
-                      'Apply by ${isInternship ? listing['applyBy'] : listing['lastDate']}',
+                      isInternship
+                          ? 'Apply by ${listing['applyBy']}'
+                          : 'Last date ${listing['lastDate']}',
                     ),
                   ],
                 ),
@@ -687,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: () => _viewDetails(listing, _showInternships),
+                    onPressed: () => _viewDetails(listing, isInternship),
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
@@ -707,17 +604,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _applyForListing(listing),
+                    onPressed: listing['status'] == 'open'
+                        ? () => _closeListing(listing)
+                        : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 107, 146, 230),
+                      backgroundColor: listing['status'] == 'open'
+                          ? const Color(0xFFE91E63)
+                          : Colors.grey.shade300,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: const Text(
-                      'Apply Now',
-                      style: TextStyle(color: Colors.white),
+                    child: Text(
+                      listing['status'] == 'open' ? 'Close' : 'Closed',
+                      style: TextStyle(
+                        color: listing['status'] == 'open'
+                            ? Colors.white
+                            : Colors.grey.shade600,
+                      ),
                     ),
                   ),
                 ),
@@ -726,56 +631,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           const SizedBox(height: 15),
         ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryCard(
-      IconData icon, String title, Color bgColor, Color iconColor, {bool isSelected = false}) {
-    return GestureDetector(
-      onTap: () => _selectCategory(title),
-      child: Container(
-        width: 90,
-        margin: const EdgeInsets.only(right: 15),
-        decoration: BoxDecoration(
-          color: isSelected ? bgColor.withOpacity(0.7) : bgColor,
-          borderRadius: BorderRadius.circular(15),
-          border: isSelected
-              ? Border.all(
-                  color: const Color.fromARGB(255, 107, 146, 230),
-                  width: 2)
-              : null,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey.shade700,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -828,34 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _currentIndex,
           onTap: (index) {
             if (index == 1) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SavedItemsScreen(
-                    savedListings: _savedListings,
-                    currentUser: widget.currentUser,
-                  ),
-                ),
-              );
-            } else if (index == 2) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ApplicationStatusScreen(
-                    currentUser: widget.currentUser,
-                  ),
-                ),
-              );
-            } else if (index == 3) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProfileScreen(
-                    userId: widget.currentUser['userId'],
-                    isHR: false, 
-                  ),
-                ),
-              );
+              _navigateToProfile();
             } else {
               setState(() => _currentIndex = index);
             }
@@ -867,25 +695,13 @@ class _HomeScreenState extends State<HomeScreen> {
           showUnselectedLabels: true,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
-          items: [
+          items: const [
             BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 0 ? Iconsax.home_25 : Iconsax.home),
+              icon: Icon(Iconsax.home),
               label: 'Home',
             ),
             BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 1 ? Iconsax.save_25 : Iconsax.save_2),
-              label: 'Saved',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 2
-                  ? Iconsax.document_text_15
-                  : Iconsax.document_text),
-              label: 'Applications',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(_currentIndex == 3
-                  ? Iconsax.profile_2user5
-                  : Iconsax.profile_2user),
+              icon: Icon(Iconsax.profile_2user),
               label: 'Profile',
             ),
           ],
@@ -898,48 +714,26 @@ class _HomeScreenState extends State<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => ProfileScreen(
-          userId: widget.currentUser['userId'], isHR: false, // Pass the user ID
+        builder: (context) => HRProfileScreen(
+          userId: _userId,
         ),
       ),
     );
   }
 
-  void _navigateToSaved() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SavedItemsScreen(
-          savedListings: _savedListings,
-          currentUser: widget.currentUser,
-        ),
-      ),
-    );
-  }
-
-  void _viewDetails(Map<String, dynamic> listing, bool internship) {
-    if (internship) {
+  void _viewDetails(Map<String, dynamic> listing, bool isInternship) {
+    if (isInternship) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => InternshipDetailScreen(
-            internship: listing,
-            isSaved: _isSaved(listing['id']),
-            onApply: () => _applyForListing(listing),
-            onSaveToggle: () => _toggleSaved(listing['id']),
-          ),
+          builder: (context) => HRInternshipDetailsScreen(internship: listing),
         ),
       );
     } else {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => JobDetailScreen(
-            job: listing,
-            isSaved: _isSaved(listing['id']),
-            onApply: () => _applyForListing(listing),
-            onSaveToggle: () => _toggleSaved(listing['id']),
-          ),
+          builder: (context) => HRJobDetailsScreen(job: listing),
         ),
       );
     }
