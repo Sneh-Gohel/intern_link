@@ -139,32 +139,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _filterListings() {
     final searchTerm = _searchController.text.toLowerCase();
-    
+
     setState(() {
       _filteredInternships = _internships.where((internship) {
-        final titleMatches = internship['title'].toLowerCase().contains(searchTerm);
-        final companyMatches = internship['companyName'].toLowerCase().contains(searchTerm);
-        
+        final titleMatches =
+            internship['title'].toLowerCase().contains(searchTerm);
+        final companyMatches =
+            internship['companyName'].toLowerCase().contains(searchTerm);
+
         if (_selectedCategory.isEmpty) {
           return titleMatches || companyMatches;
         } else {
           final categoryKeywords = _categoryKeywords[_selectedCategory] ?? [];
-          final matchesCategory = categoryKeywords.any((keyword) => 
-              internship['title'].toLowerCase().contains(keyword));
+          final matchesCategory = categoryKeywords.any(
+              (keyword) => internship['title'].toLowerCase().contains(keyword));
           return (titleMatches || companyMatches) && matchesCategory;
         }
       }).toList();
 
       _filteredJobs = _jobs.where((job) {
         final titleMatches = job['title'].toLowerCase().contains(searchTerm);
-        final companyMatches = job['companyName'].toLowerCase().contains(searchTerm);
-        
+        final companyMatches =
+            job['companyName'].toLowerCase().contains(searchTerm);
+
         if (_selectedCategory.isEmpty) {
           return titleMatches || companyMatches;
         } else {
           final categoryKeywords = _categoryKeywords[_selectedCategory] ?? [];
-          final matchesCategory = categoryKeywords.any((keyword) => 
-              job['title'].toLowerCase().contains(keyword));
+          final matchesCategory = categoryKeywords
+              .any((keyword) => job['title'].toLowerCase().contains(keyword));
           return (titleMatches || companyMatches) && matchesCategory;
         }
       }).toList();
@@ -198,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
           'title': data['title'],
           'companyLogo': company['logo'],
           'companyName': company['name'],
-          'location': data['location'], 
+          'location': data['location'],
           'stipend': data['stipen'],
           'duration': data['duration'],
           'applyBy': data['applyBy'],
@@ -364,11 +367,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Hello,',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.white.withOpacity(0.8),
+                                color: Color.fromARGB(255, 241, 92, 142),
                               ),
                             ),
                             Text(
@@ -376,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: Color(0xFFD23369),
                               ),
                             ),
                           ],
@@ -731,7 +734,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryCard(
-      IconData icon, String title, Color bgColor, Color iconColor, {bool isSelected = false}) {
+      IconData icon, String title, Color bgColor, Color iconColor,
+      {bool isSelected = false}) {
     return GestureDetector(
       onTap: () => _selectCategory(title),
       child: Container(
@@ -742,8 +746,7 @@ class _HomeScreenState extends State<HomeScreen> {
           borderRadius: BorderRadius.circular(15),
           border: isSelected
               ? Border.all(
-                  color: const Color.fromARGB(255, 107, 146, 230),
-                  width: 2)
+                  color: const Color.fromARGB(255, 107, 146, 230), width: 2)
               : null,
         ),
         child: Column(
@@ -852,7 +855,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(
                   builder: (context) => ProfileScreen(
                     userId: widget.currentUser['userId'],
-                    isHR: false, 
+                    isHR: false,
+                    currentUser: widget.currentUser, 
                   ),
                 ),
               );
@@ -899,7 +903,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ProfileScreen(
-          userId: widget.currentUser['userId'], isHR: false, // Pass the user ID
+          userId: widget.currentUser['userId'], isHR: false,currentUser: widget.currentUser, // Pass the user ID
         ),
       ),
     );

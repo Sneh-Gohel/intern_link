@@ -397,6 +397,7 @@ class _HRJobDetailsScreenState extends State<HRJobDetailsScreen> {
                   builder: (context) => ProfileScreen(
                     userId: applicant['userId'],
                     isHR: true,
+                    currentUser: const {},
                   ),
                 ),
               );

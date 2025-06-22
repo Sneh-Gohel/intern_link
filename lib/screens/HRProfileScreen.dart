@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:intern_link/screens/EditHrDetailsScreen.dart';
 import 'package:intern_link/screens/LoginScreen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -197,7 +198,21 @@ class _HRProfileScreenState extends State<HRProfileScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () {
-                        print("Edit Profile Button Pressed");
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => EditHrDetailsScreen(
+                              hrData: _user!, // Your HR user data map
+                              onSave: (updatedData) async {
+                                // Handle the save operation
+                                await FirebaseFirestore.instance
+                                    .collection('users')
+                                    .doc(_user!['userId'])
+                                    .update(updatedData);
+                              },
+                            ),
+                          ),
+                        );
                       },
                       icon: const Icon(Iconsax.edit, size: 18),
                       label: const Text('Edit Company Profile'),

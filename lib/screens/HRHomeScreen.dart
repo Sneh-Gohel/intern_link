@@ -315,7 +315,7 @@ class _HRHomeScreenState extends State<HRHomeScreen> {
                               'Hello,',
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.white,
+                                color: Color.fromARGB(255, 241, 92, 142),
                               ),
                             ),
                             Text(
@@ -323,7 +323,7 @@ class _HRHomeScreenState extends State<HRHomeScreen> {
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                                color: Color(0xFFD23369),
                               ),
                             ),
                           ],

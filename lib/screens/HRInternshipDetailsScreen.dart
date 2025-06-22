@@ -368,6 +368,7 @@ class _HRInternshipDetailsScreenState extends State<HRInternshipDetailsScreen> {
                   builder: (context) => ProfileScreen(
                     userId: applicant['userId'],
                     isHR: true,
+                    currentUser: const {},
                   ),
                 ),
               );
