@@ -290,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(listing['id'])
           .collection('activities')
           .doc('lists')
-          .update({
+          .set({
         '${widget.currentUser['userId']}': 'requested',
       });
 
@@ -299,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
           .doc(widget.currentUser['userId'])
           .collection('applied')
           .doc(listing['type'])
-          .update({
+          .set({
         listing['id']: 'requested',
       });
 

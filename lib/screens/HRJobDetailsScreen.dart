@@ -124,216 +124,191 @@ class _HRJobDetailsScreenState extends State<HRJobDetailsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: Column(
-        children: [
-          // Job Details Card
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Job Details Card
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.job['title'],
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A3C7C),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          widget.job['companyName'],
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          children: [
-                            _buildDetailChip(
-                              Iconsax.money,
-                              widget.job['salary'],
-                            ),
-                            const SizedBox(width: 10),
-                            _buildDetailChip(
-                              Iconsax.location,
-                              widget.job['location'],
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            _buildDetailChip(
-                              Iconsax.clock,
-                              'Full-time',
-                            ),
-                            const SizedBox(width: 10),
-                            _buildDetailChip(
-                              Iconsax.calendar,
-                              'Last date ${widget.job['lastDate']}',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Job Description:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A3C7C),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(widget.job['JD']),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Skills Required:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF1A3C7C),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(widget.job['skillsRequired']),
-                        const SizedBox(height: 16),
-                        if (widget.job['AR'] != null &&
-                            widget.job['AR'].isNotEmpty)
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Responsibilities:',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1A3C7C),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Column(
-                                children: (widget.job['AR'] as List).map((ar) {
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 4),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text('• '),
-                                        Expanded(child: Text(ar)),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                      ],
+                  Text(
+                    widget.job['title'],
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A3C7C),
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Applicants Section
+                  const SizedBox(height: 8),
+                  Text(
+                    widget.job['companyName'],
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Applicants',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1A3C7C),
-                        ),
+                      _buildDetailChip(
+                        Iconsax.money,
+                        widget.job['salary'],
                       ),
-                      DropdownButton<String>(
-                        value: _filterStatus,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'requested',
-                            child: Text('Requested'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'approved',
-                            child: Text('Approved'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'rejected',
-                            child: Text('Rejected'),
-                          ),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
-                            setState(() => _filterStatus = value);
-                          }
-                        },
-                        style: const TextStyle(
-                          color: Color(0xFF1A3C7C),
-                        ),
-                        underline: Container(
-                          height: 1,
-                          color: const Color(0xFF6B92E6),
-                        ),
+                      const SizedBox(width: 10),
+                      _buildDetailChip(
+                        Iconsax.location,
+                        widget.job['location'],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      _buildDetailChip(
+                        Iconsax.clock,
+                        'Full-time',
+                      ),
+                      const SizedBox(width: 10),
+                      _buildDetailChip(
+                        Iconsax.calendar,
+                        'Last date ${widget.job['lastDate']}',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Job Description:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A3C7C),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(widget.job['JD']),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Skills Required:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1A3C7C),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(widget.job['skillsRequired']),
+                  const SizedBox(height: 16),
+                  if (widget.job['AR'] != null && widget.job['AR'].isNotEmpty)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Responsibilities:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1A3C7C),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Column(
+                          children: (widget.job['AR'] as List).map((ar) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('• '),
+                                  Expanded(child: Text(ar)),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ),
                 ],
               ),
             ),
-          ),
+            const SizedBox(height: 24),
 
-          // Applicants List
-          Container(
-            height: MediaQuery.of(context).size.height * 0.30,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 10,
-                  offset: Offset(0, -5),
+            // Applicants Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Applicants',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A3C7C),
+                  ),
+                ),
+                DropdownButton<String>(
+                  value: _filterStatus,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'requested',
+                      child: Text('Requested'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'approved',
+                      child: Text('Approved'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'rejected',
+                      child: Text('Rejected'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _filterStatus = value);
+                    }
+                  },
+                  style: const TextStyle(
+                    color: Color(0xFF1A3C7C),
+                  ),
+                  underline: Container(
+                    height: 1,
+                    color: const Color(0xFF6B92E6),
+                  ),
                 ),
               ],
             ),
-            child: Column(
-              children: [
-                const SizedBox(height: 12),
-                _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _filteredApplicants.isEmpty
-                        ? const Center(
-                            child: Text('No applicants found'),
-                          )
-                        : Expanded(
-                            child: ListView.builder(
-                              itemCount: _filteredApplicants.length,
-                              itemBuilder: (context, index) {
-                                final applicant = _filteredApplicants[index];
-                                return _buildApplicantCard(applicant);
-                              },
-                            ),
-                          ),
-              ],
-            ),
-          ),
-        ],
+            const SizedBox(height: 12),
+
+            // Applicants List
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _filteredApplicants.isEmpty
+                    ? Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Center(
+                          child: Text('No applicants found'),
+                        ),
+                      )
+                    : Column(
+                        children: _filteredApplicants.map((applicant) {
+                          return _buildApplicantCard(applicant);
+                        }).toList(),
+                      ),
+          ],
+        ),
       ),
     );
   }

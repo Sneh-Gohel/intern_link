@@ -253,25 +253,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   // Edit Profile Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        print("Edit Profile Button Pressed");
-                      },
-                      icon: const Icon(Iconsax.edit, size: 18),
-                      label: const Text('Edit Profile'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  widget.isHR
+                      ? const Center()
+                      : SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              print("Edit Profile Button Pressed");
+                            },
+                            icon: const Icon(Iconsax.edit, size: 18),
+                            label: const Text('Edit Profile'),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              side: const BorderSide(
+                                color: Color(0xFF6B92E6),
+                              ),
+                            ),
+                          ),
                         ),
-                        side: const BorderSide(
-                          color: Color(0xFF6B92E6),
-                        ),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 24),
 
                   // Personal Information Section
@@ -441,17 +443,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const Icon(
+            Icon(
               Iconsax.document_text,
               color: Color(0xFF6B92E6),
               size: 24,
             ),
-            const SizedBox(width: 12),
-            const Expanded(
+            SizedBox(width: 12),
+            Expanded(
               child: Text(
-                'View My Resume',
+                'View Resume',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
@@ -461,7 +463,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             Icon(
               Iconsax.arrow_right_3,
-              color: const Color(0xFF6B92E6),
+              color: Color(0xFF6B92E6),
             ),
           ],
         ),

@@ -230,8 +230,8 @@ class _InternshipDetailScreenState extends State<InternshipDetailScreen> {
             widget.onApply();
             setState(() => _isApplying = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: const Text('Application submitted successfully!'),
+              const SnackBar(
+                content: Text('Application submitted successfully!'),
                 behavior: SnackBarBehavior.floating,
                 backgroundColor: Colors.green,
               ),
